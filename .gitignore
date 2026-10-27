@@ -1,0 +1,27 @@
+# Build artifacts
+build/
+bin/
+obj/
+*.exe
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+
+# Dependencies
+node_modules/
+
+# Test workspace & temporary files
+test_workspace/
+*.tmp
+*.tmp_*
+
+# OS & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+imgui.ini
+.DS_Store
+Thumbs.db

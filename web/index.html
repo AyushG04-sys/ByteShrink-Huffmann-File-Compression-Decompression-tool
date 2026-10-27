@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ByteShrink — Smart File Compression Studio</title>
+  <meta name="description" content="Privacy-first, offline file compression studio powered by Huffman Coding, Min-Heaps, and Binary Trees.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>  
+
+  <!-- Top Application Header (Change One: Theme button removed, balanced spacing) -->
+  <header class="app-header">
+    <div class="brand-wrapper" id="brandHomeBtn">
+      <div class="brand-logo-icon">BS</div>
+      <div>
+        <div class="brand-title">ByteShrink : Smart File Compression Studio</div>
+        <div class="brand-tagline">Powered by Huffman Coding Algorithm</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-header-help" id="headerHelpBtn">
+        <span>[ ? ]</span> Help & DSA Docs
+      </button>
+    </div>
+  </header>
+
+  <!-- Top Navigation Tabs -->
+  <nav class="top-nav" aria-label="Main Navigation">
+    <button class="nav-tab-btn nav-welcome-btn active" data-tab="welcome">Welcome</button>
+    <button class="nav-tab-btn" data-tab="dashboard">Dashboard</button>
+    <button class="nav-tab-btn" data-tab="compress">Compress Files</button>
+    <button class="nav-tab-btn" data-tab="decompress">Decompress Files</button>
+    <button class="nav-tab-btn" data-tab="explorer">Algorithm Explorer</button>
+    <button class="nav-tab-btn" data-tab="help">About & Settings</button>
+  </nav>
+
+  <!-- Main View Container -->
+  <main class="app-container">
+
+    <!-- ====================================================================
+         CHANGE THREE: WELCOME / ONBOARDING SCREEN (Default for fresh sessions)
+         ==================================================================== -->
+    <section class="view-section active" id="view-welcome">
+      <div class="welcome-hero">
+        <div class="welcome-logo-badge">
+          <div class="brand-logo-icon">BS</div>
+          <span style="font-family: var(--font-mono); font-weight: 800; color: var(--accent-orange);">BYTE-SHRINK v1.0</span>
+        </div>
+        <h1>Welcome to ByteShrink</h1>
+        <p class="hero-subtitle">Compress smarter. Restore perfectly. Keep your files private.</p>
+        <p class="hero-intro">
+          ByteShrink is a local-first, privacy-focused file compression and decompression utility powered by the <strong>Huffman Coding algorithm</strong>. 
+          It processes files entirely on your device without uploading your documents, images, video, or audio to any external cloud service.
+        </p>
+      </div>
+
+      <!-- 4 Feature Cards -->
+      <div class="welcome-features-grid">
+        <div class="feature-box border-orange">
+          <div class="feature-box-icon">📦</div>
+          <h3>Compress Files</h3>
+          <p>Encode any file using variable-length Huffman codes and store it in the custom <code>.hfx</code> archive format. Real-time statistics display exact bytes saved, compression ratios, and processing speed.</p>
+        </div>
+
+        <div class="feature-box border-purple">
+          <div class="feature-box-icon">🔓</div>
+          <h3>Decompress Archives</h3>
+          <p>Restore original files bit-for-bit from compatible ByteShrink archives. Built-in IEEE 802.3 CRC-32 checksums guarantee 100% exact file integrity on every decompression pass.</p>
+        </div>
+
+        <div class="feature-box border-purple">
+          <div class="feature-box-icon">🔬</div>
+          <h3>Algorithm Explorer</h3>
+          <p>Visually inspect the 2D Huffman Tree with pan and zoom. Explore the 256-symbol byte frequency distribution, prefix-free binary codes, and the priority queue's step-by-step greedy merges.</p>
+        </div>
+
+        <div class="feature-box border-orange">
+          <div class="feature-box-icon">🛡️</div>
+          <h3>Privacy-First & Local</h3>
+          <p>All compression and decompression routines run locally in native C++. Your data never leaves your computer, ensuring complete privacy.</p>
+        </div>
+      </div>
+
+      <!-- Supported File Types Section on Welcome -->
+      <div class="section-heading-bar">Supported File Formats & Lossless Byte Processing</div>
+      <div class="supported-types-grid">
+        <div class="type-category-box">
+          <div class="type-badge-title">[ Documents ]</div>
+          <div class="type-extensions">.pdf, .doc, .docx, .txt, .csv, .xml, .json</div>
+        </div>
+        <div class="type-category-box">
+          <div class="type-badge-title">[ Images ]</div>
+          <div class="type-extensions">.jpg, .jpeg, .png, .bmp, .webp, .tiff</div>
+        </div>
+        <div class="type-category-box">
+          <div class="type-badge-title">[ Videos ]</div>
+          <div class="type-extensions">.mp4, .vod, .avi, .webm, .mkv</div>
+        </div>
+        <div class="type-category-box">
+          <div class="type-badge-title">[ Audio ]</div>
+          <div class="type-extensions">.mp3, .wav, .flac, .aac, .ogg</div>
+        </div>
+        <div class="type-category-box">
+          <div class="type-badge-title">[ Other Binary ]</div>
+          <div class="type-extensions">Any arbitrary binary file format (all 256 byte values preserved)</div>
+        </div>
+      </div>
+
+      <!-- Privacy Statement Callout -->
+      <div class="privacy-callout">
+        <div class="lock-icon">🔒</div>
+        <div class="privacy-callout-text">
+          <h4>Privacy-First Offline Architecture</h4>
+          <p>Your files stay on your device. ByteShrink does not require cloud uploads or an internet connection for local compression and decompression.</p>
+        </div>
+      </div>
+
+      <!-- Prominent Get Started Button -->
+      <div class="get-started-cta-wrapper">
+        <button class="btn-get-started" id="btnGetStarted">
+          <span>⚡</span> GET STARTED <span>➔</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         CHANGE FOUR: DASHBOARD SCREEN (Matching screenshot visual reference)
+         ==================================================================== -->
+    <section class="view-section" id="view-dashboard">
+      <!-- Retro-Terminal Welcome Banner -->
+      <div class="welcome-banner">
+        <span class="banner-icon">⚡</span>
+        <span>WELCOME TO BYTESHRINK. PRIVACY-FIRST LOSSLESS COMPRESSION ENGINE DEMONSTRATING GREEDY ALGORITHMS, MIN-HEAPS, AND BINARY FILE HANDLING.</span>
+      </div>
+
+      <!-- 3 Main Action Cards Grid (Exact match with screenshot) -->
+      <div class="action-cards-grid">
+        <!-- Card 1: Compress Files -->
+        <div class="action-card card-compress">
+          <div class="card-hazard-stripe"></div>
+          <div class="card-content">
+            <h2 class="card-title">COMPRESS FILES</h2>
+            <p class="card-desc">Compress documents, images, video, audio, and raw binary into .hfx archives.</p>
+            <button class="btn-card-action btn-orange" id="cardBtnCompress">
+              <span>⚡</span> OPEN COMPRESSOR
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 2: Decompress Archives -->
+        <div class="action-card card-decompress">
+          <div class="card-hazard-stripe"></div>
+          <div class="card-content">
+            <h2 class="card-title">DECOMPRESS ARCHIVES</h2>
+            <p class="card-desc">Restore exact byte-for-byte original files from .hfx archives with CRC32 verification.</p>
+            <button class="btn-card-action btn-purple" id="cardBtnDecompress">
+              <span>⚡</span> OPEN DECOMPRESSOR
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 3: Algorithm Explorer -->
+        <div class="action-card card-explorer">
+          <div class="card-hazard-stripe"></div>
+          <div class="card-content">
+            <h2 class="card-title">ALGORITHM EXPLORER</h2>
+            <p class="card-desc">Inspect the Huffman Tree, min-heap merges, and generated prefix-free codes.</p>
+            <button class="btn-card-action btn-outline-orange" id="cardBtnExplorer">
+              <span>⚡</span> EXPLORE TREE & CODES
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Supported File Types Section -->
+      <div class="section-heading-bar">SUPPORTED FILE TYPES & BYTE-LEVEL PROCESSING</div>
+      <div class="supported-types-grid">
+        <div class="type-category-box">
+          <div class="type-badge-title">[ DOCUMENTS ]</div>
+          <div class="type-extensions">.pdf, .doc, .docx, .txt, .csv, .xml</div>
+        </div>
+        <div class="type-category-box">
+          <div class="type-badge-title">[ IMAGES ]</div>
+          <div class="type-extensions">.jpg, .bmp, .webp, .tiff, .png</div>
+        </div>
+        <div class="type-category-box">
+          <div class="type-badge-title">[ VIDEOS ]</div>
+          <div class="type-extensions">.mp4, .vod, .avi, .webm, .mkv</div>
+        </div>
+        <div class="type-category-box">
+          <div class="type-badge-title">[ AUDIO ]</div>
+          <div class="type-extensions">.mp3, .wav, .flac, .aac, .ogg</div>
+        </div>
+        <div class="type-category-box">
+          <div class="type-badge-title">[ OTHER BINARY ]</div>
+          <div class="type-extensions">Any arbitrary binary file format (all 256 bytes preserved)</div>
+        </div>
+      </div>
+
+      <!-- Recent Activity Table -->
+      <div class="section-heading-bar">RECENT ACTIVITY</div>
+      <div class="activity-table-wrapper">
+        <table class="activity-table" id="dashboardActivityTable">
+          <thead>
+            <tr>
+              <th>TIME</th>
+              <th>ACTION</th>
+              <th>FILE NAME</th>
+              <th>ORIGINAL SIZE</th>
+              <th>OUTPUT SIZE</th>
+              <th>RESULT SUMMARY</th>
+            </tr>
+          </thead>
+          <tbody id="activityTableBody">
+            <!-- Dynamic local activity records populated via app.js -->
+          </tbody>
+        </table>
+        <div class="empty-activity-msg" id="emptyActivityMsg">
+          No files compressed or decompressed yet in this session.
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         COMPRESS FILES SCREEN
+         ==================================================================== -->
+    <section class="view-section" id="view-compress">
+      <div class="welcome-banner">
+        <span class="banner-icon">📦</span>
+        <span>FILE COMPRESSOR — LOSSLESS HUFFMAN ENCODING ENGINE</span>
+      </div>
+
+      <div class="studio-panel">
+        <!-- Drag & Drop Zone -->
+        <div class="dropzone-area" id="compressDropzone">
+          <input type="file" id="compressFileInput" style="display: none;">
+          <div class="dropzone-icon">📁</div>
+          <div class="dropzone-title">DRAG & DROP FILE HERE, OR CLICK TO BROWSE</div>
+          <div class="dropzone-subtitle">Supported: Documents (.pdf, .docx), Images (.jpg, .png, .bmp), Video (.mp4), Audio (.mp3), and Binary files</div>
+        </div>
+
+        <!-- File Metadata Card -->
+        <div class="file-meta-card" id="compressMetaCard" style="display: none;">
+          <div>
+            <div class="meta-field-label">File Name</div>
+            <div class="meta-field-val" id="metaFileName">-</div>
+          </div>
+          <div>
+            <div class="meta-field-label">File Size</div>
+            <div class="meta-field-val" id="metaFileSize">-</div>
+          </div>
+          <div>
+            <div class="meta-field-label">Category</div>
+            <div class="meta-field-val" id="metaFileCategory" style="color: var(--accent-orange);">-</div>
+          </div>
+          <div>
+            <div class="meta-field-label">Detected Signature</div>
+            <div class="meta-field-val" id="metaFileSig">-</div>
+          </div>
+        </div>
+
+        <!-- Output Archive Name Input -->
+        <div class="input-group">
+          <label class="input-label" for="compressOutputName">Archive Output Name (Format: .hfx)</label>
+          <input type="text" class="text-input" id="compressOutputName" placeholder="archive_output.hfx">
+          <small style="color: var(--text-muted); font-size: 13px; margin-top: 6px; display: block;">
+            [*] Note: The output is an encoded Huffman archive (<code>.hfx</code>), like a <code>.zip</code> file. It cannot be opened directly in image/media players until decompressed.
+          </small>
+        </div>
+
+        <!-- Error / Validation Banner -->
+        <div class="error-banner" id="compressErrorBanner" style="display: none;"></div>
+
+        <!-- Start Compression Button -->
+        <button class="btn-card-action btn-orange" id="btnStartCompress" style="width: auto; padding: 14px 36px;">
+          <span>⚡</span> START COMPRESSION
+        </button>
+
+        <!-- Progress Indicator -->
+        <div class="progress-container" id="compressProgressBox">
+          <div class="progress-track">
+            <div class="progress-fill" id="compressProgressFill"></div>
+          </div>
+          <div class="progress-status-text" id="compressStatusText">Analyzing byte frequencies...</div>
+        </div>
+
+        <!-- Results Summary Card -->
+        <div class="results-card" id="compressResultsCard">
+          <div class="results-title">✔ COMPRESSION COMPLETED SUCCESSFULLY</div>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-label">Original Size</div>
+              <div class="stat-val" id="statOrigSize">-</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Compressed Size</div>
+              <div class="stat-val" id="statCompSize" style="color: var(--accent-orange);">-</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Space Saved</div>
+              <div class="stat-val" id="statSpaceSaved">-</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Compression Ratio</div>
+              <div class="stat-val" id="statRatio">-</div>
+            </div>
+          </div>
+
+          <div class="comparison-bar-track">
+            <div class="comparison-bar-fill" id="comparisonBarFill" style="width: 50%;">Compressed Size</div>
+          </div>
+
+          <div style="background-color: var(--bg-surface); padding: 14px; border-radius: var(--radius-sm); border-left: 3px solid var(--accent-orange); margin-bottom: 20px;">
+            <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Diagnostic Notice</div>
+            <div style="font-size: 14px; color: var(--text-secondary); margin-top: 4px;" id="statDiagnosticText">-</div>
+          </div>
+
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <button class="btn-card-action btn-orange" id="btnDownloadArchive" style="width: auto; padding: 10px 20px;">
+              <span>⬇️</span> Download Compressed Archive (.hfx)
+            </button>
+            <button class="btn-card-action btn-purple" id="btnDecompressNow" style="width: auto; padding: 10px 20px;">
+              <span>🔓</span> Decompress & Open Restored File Now
+            </button>
+            <button class="btn-card-action btn-outline-orange" id="btnViewInExplorer" style="width: auto; padding: 10px 20px;">
+              <span>🔬</span> Inspect in Algorithm Explorer
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         DECOMPRESS ARCHIVES SCREEN
+         ==================================================================== -->
+    <section class="view-section" id="view-decompress">
+      <div class="welcome-banner">
+        <span class="banner-icon">🔓</span>
+        <span>FILE DECOMPRESSOR — LOSSLESS BITSTREAM RESTORATION & CRC-32 VERIFICATION</span>
+      </div>
+
+      <div class="studio-panel">
+        <!-- Archive Dropzone -->
+        <div class="dropzone-area" id="decompressDropzone">
+          <input type="file" id="decompressFileInput" accept=".hfx" style="display: none;">
+          <div class="dropzone-icon">📦</div>
+          <div class="dropzone-title">DRAG & DROP .HFX ARCHIVE HERE, OR CLICK TO BROWSE</div>
+          <div class="dropzone-subtitle">Select a ByteShrink compressed archive to restore original bytes</div>
+        </div>
+
+        <!-- Inspected Archive Card -->
+        <div class="file-meta-card" id="decompressMetaCard" style="display: none; border-left-color: var(--accent-purple);">
+          <div>
+            <div class="meta-field-label">Original Filename</div>
+            <div class="meta-field-val" id="decompMetaName" style="color: var(--accent-purple);">-</div>
+          </div>
+          <div>
+            <div class="meta-field-label">Original Size</div>
+            <div class="meta-field-val" id="decompMetaSize">-</div>
+          </div>
+          <div>
+            <div class="meta-field-label">Distinct Symbols</div>
+            <div class="meta-field-val" id="decompMetaSymbols">-</div>
+          </div>
+          <div>
+            <div class="meta-field-label">Expected CRC-32</div>
+            <div class="meta-field-val" id="decompMetaCrc">-</div>
+          </div>
+        </div>
+
+        <!-- Output Restored Name Input -->
+        <div class="input-group">
+          <label class="input-label" for="decompressOutputName">Restored Filename</label>
+          <input type="text" class="text-input" id="decompressOutputName" placeholder="restored_document.pdf">
+        </div>
+
+        <!-- Error Banner -->
+        <div class="error-banner error-purple" id="decompressErrorBanner" style="display: none;"></div>
+
+        <!-- Start Decompress Button -->
+        <button class="btn-card-action btn-purple" id="btnStartDecompress" style="width: auto; padding: 14px 36px;">
+          <span>⚡</span> START DECOMPRESSION
+        </button>
+
+        <!-- Progress Indicator -->
+        <div class="progress-container" id="decompressProgressBox">
+          <div class="progress-track">
+            <div class="progress-fill" id="decompressProgressFill" style="background: var(--accent-purple);"></div>
+          </div>
+          <div class="progress-status-text" id="decompressStatusText">Decoding bitstream...</div>
+        </div>
+
+        <!-- Decompress Results Card -->
+        <div class="results-card" id="decompressResultsCard">
+          <div class="results-title" style="color: var(--accent-purple);">✔ DECOMPRESSION COMPLETED — ALL BYTES RESTORED EXACTLY</div>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-label">Restored File</div>
+              <div class="stat-val" id="decompStatName">-</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Restored Size</div>
+              <div class="stat-val" id="decompStatSize">-</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">CRC-32 Checksum</div>
+              <div class="stat-val" id="decompStatCrc" style="color: var(--accent-green);">-</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Verification Status</div>
+              <div class="stat-val" style="color: var(--accent-green);">100% MATCH</div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
+            <button class="btn-card-action btn-purple" id="btnDownloadRestoredFile" style="width: auto; padding: 10px 24px;">
+              <span>⬇️</span> Download Restored File
+            </button>
+            <button class="btn-card-action btn-outline-orange" id="btnOpenRestoredFile" style="width: auto; padding: 10px 24px;">
+              <span>📂</span> Open in Explorer
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         ALGORITHM EXPLORER & 2D TREE VISUALIZER
+         ==================================================================== -->
+    <section class="view-section" id="view-explorer">
+      <div class="welcome-banner">
+        <span class="banner-icon">🔬</span>
+        <span>ALGORITHM EXPLORER — INTERACTIVE HUFFMAN TREE & GREEDY MERGE VISUALIZER</span>
+      </div>
+
+      <div class="studio-panel">
+        <!-- Live Playground Input -->
+        <div class="input-group">
+          <label class="input-label" for="explorerCustomText">Live Interactive Input Playground (Type to regenerate tree in real time)</label>
+          <div style="display: flex; gap: 12px;">
+            <input type="text" class="text-input" id="explorerCustomText" value="ByteShrink Huffman Coding DSA Project">
+            <button class="btn-card-action btn-orange" id="btnUpdateExplorer" style="width: auto; padding: 12px 24px; white-space: nowrap;">
+              <span>⚡</span> Rebuild Tree
+            </button>
+          </div>
+        </div>
+
+        <!-- Explorer Sub-Navigation Tabs -->
+        <div class="explorer-controls">
+          <button class="btn-explorer-subtab active" data-subtab="tree">Interactive 2D Tree</button>
+          <button class="btn-explorer-subtab" data-subtab="symbols">Symbol Frequency & Codes</button>
+          <button class="btn-explorer-subtab" data-subtab="merges">Priority Queue Greedy Merges</button>
+        </div>
+
+        <!-- Subview 1: 2D Interactive Tree Canvas -->
+        <div class="explorer-subview active" id="subview-tree">
+          <div class="tree-canvas-container">
+            <div class="canvas-toolbar">
+              <button class="btn-canvas-tool" id="btnZoomIn">+</button>
+              <button class="btn-canvas-tool" id="btnZoomOut">−</button>
+              <button class="btn-canvas-tool" id="btnResetView">Reset View</button>
+            </div>
+            <div class="canvas-info-overlay">
+              <span id="canvasZoomLabel">Zoom: 100%</span> | Drag to Pan Canvas
+            </div>
+            <canvas id="huffmanTreeCanvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Subview 2: Symbol & Code Table -->
+        <div class="explorer-subview" id="subview-symbols" style="display: none;">
+          <div class="activity-table-wrapper" style="max-height: 480px; overflow-y: auto;">
+            <table class="activity-table">
+              <thead>
+                <tr>
+                  <th>BYTE (DEC)</th>
+                  <th>HEX</th>
+                  <th>SYMBOL / ASCII</th>
+                  <th>FREQUENCY</th>
+                  <th>HUFFMAN PREFIX CODE</th>
+                  <th>BITS</th>
+                </tr>
+              </thead>
+              <tbody id="symbolTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Subview 3: Greedy Priority Queue Merges -->
+        <div class="explorer-subview" id="subview-merges" style="display: none;">
+          <div class="activity-table-wrapper" style="max-height: 480px; overflow-y: auto;">
+            <table class="activity-table">
+              <thead>
+                <tr>
+                  <th>STEP</th>
+                  <th>MIN #1 (LEFT)</th>
+                  <th>MIN #2 (RIGHT)</th>
+                  <th>COMBINED FREQUENCY</th>
+                  <th>GREEDY ACTION</th>
+                </tr>
+              </thead>
+              <tbody id="mergeTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         ABOUT & SETTINGS / HELP & DSA DOCS
+         ==================================================================== -->
+    <section class="view-section" id="view-help">
+      <div class="welcome-banner">
+        <span class="banner-icon">📖</span>
+        <span>DSA THEORY & COLLEGE EVALUATION REFERENCE GUIDE</span>
+      </div>
+
+      <div class="studio-panel">
+        <h2 style="font-family: var(--font-mono); color: var(--accent-orange); margin-bottom: 16px;">
+          1. Core Data Structures & Algorithms in ByteShrink
+        </h2>
+        <ul style="margin-left: 24px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 24px;">
+          <li><strong>Greedy Algorithm:</strong> At each step, selects the two nodes with the smallest frequencies and combines them. This optimal substructure guarantees minimal weighted external path length.</li>
+          <li><strong>Min-Heap / Priority Queue:</strong> Stores candidate nodes in a 0-indexed binary heap array with <code>siftUp</code> and <code>siftDown</code> operations running in <code>O(log k)</code> time. Overall tree construction runs in <code>O(k log k)</code>.</li>
+          <li><strong>Binary Tree:</strong> Represents prefix-free codes where leaf nodes contain byte symbols and branch edges represent binary bits (<code>0</code> for left, <code>1</code> for right).</li>
+          <li><strong>Bit Packing:</strong> Packs variable-length bitstrings MSB-first into raw binary bytes with 64KB buffering.</li>
+          <li><strong>Integrity Checksum:</strong> IEEE 802.3 CRC-32 polynomial (<code>0xEDB88320</code>) ensures byte-for-byte exactness upon decompression.</li>
+        </ul>
+
+        <h2 style="font-family: var(--font-mono); color: var(--accent-purple); margin-bottom: 16px;">
+          2. Time and Space Complexity
+        </h2>
+        <div class="activity-table-wrapper" style="margin-bottom: 24px;">
+          <table class="activity-table">
+            <thead>
+              <tr>
+                <th>PHASE</th>
+                <th>TIME COMPLEXITY</th>
+                <th>SPACE COMPLEXITY</th>
+                <th>EXPLANATION</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Frequency Counting</strong></td>
+                <td><code>O(n)</code></td>
+                <td><code>O(1)</code></td>
+                <td>Single streaming pass over <code>n</code> bytes with fixed 256-element counter.</td>
+              </tr>
+              <tr>
+                <td><strong>Min-Heap Construction</strong></td>
+                <td><code>O(k log k)</code></td>
+                <td><code>O(k)</code></td>
+                <td>Inserting <code>k</code> distinct symbols into priority queue (<code>k ≤ 256</code>).</td>
+              </tr>
+              <tr>
+                <td><strong>Greedy Tree Merging</strong></td>
+                <td><code>O(k log k)</code></td>
+                <td><code>O(k)</code></td>
+                <td>Exactly <code>k - 1</code> merges combining two minimum nodes.</td>
+              </tr>
+              <tr>
+                <td><strong>Code Generation</strong></td>
+                <td><code>O(k)</code></td>
+                <td><code>O(k)</code></td>
+                <td>Single recursive DFS traversal visiting <code>2k - 1</code> nodes.</td>
+              </tr>
+              <tr>
+                <td><strong>Bitstream Encoding</strong></td>
+                <td><code>O(n)</code></td>
+                <td><code>O(1)</code></td>
+                <td>O(1) array code lookup with 64KB I/O buffer.</td>
+              </tr>
+              <tr>
+                <td><strong>Bitstream Decoding</strong></td>
+                <td><code>O(b)</code></td>
+                <td><code>O(1)</code></td>
+                <td>Traversing tree edges for each of the <code>b</code> payload bits.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 style="font-family: var(--font-mono); color: var(--accent-orange); margin-bottom: 16px;">
+          3. Shannon Entropy & Pre-Compressed Files
+        </h2>
+        <p style="color: var(--text-secondary); line-height: 1.7; margin-bottom: 24px;">
+          Formats such as JPEG, PNG, MP4, MP3, and DOCX (which is a ZIP container) already employ internal entropy coding (such as DEFLATE, DCT quantization, or Huffman coding). 
+          Their byte distribution exhibits near-maximum Shannon entropy (~8 bits per byte). Losslessly compressing an already-compressed file cannot reduce it further, and adding the 23-byte archive header and frequency table results in a slightly larger file. 
+          ByteShrink explicitly identifies and reports this honest physical reality.
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- JavaScript Scripts -->
+  <script src="js/tree_canvas.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

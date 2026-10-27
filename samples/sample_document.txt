@@ -1,0 +1,49 @@
+================================================================================
+                    HUFFMAN CODING: THEORY AND APPLICATIONS
+                 A Data Structures and Algorithms Investigation
+================================================================================
+
+1. INTRODUCTION
+Data compression is a fundamental area of computer science that deals with
+reducing the physical storage space required to represent information. Among
+lossless compression techniques, Huffman Coding remains one of the most elegant
+and influential algorithms ever conceived.
+
+Invented by David A. Huffman in 1952 while completing his doctorate at the
+Massachusetts Institute of Technology (MIT), this algorithm constructs an optimal
+prefix-free binary code for a known set of symbol frequencies.
+
+2. THE GREEDY CHOICE PROPERTY
+At its heart, Huffman's algorithm is greedy. It builds the code tree from the
+bottom up. In each step, the algorithm locates the two symbols or subtrees with
+the smallest probability of occurrence and combines them into an internal node.
+The combined node's weight equals the sum of its children's weights.
+
+Because the least frequent symbols are merged earliest, they end up farthest
+from the root of the tree, receiving the longest binary codewords. Conversely,
+the most frequent symbols remain near the top of the tree, receiving the shortest
+codewords (often as few as 2 or 3 bits).
+
+3. PREFIX-FREE CODES AND UNIQUE DECIPHERABILITY
+A prefix code (more accurately, a prefix-free code) is a code system in which no
+valid codeword is a prefix of any other codeword. For example, if 'A' is encoded
+as '0', then no other codeword can begin with '0'.
+
+This crucial property eliminates any ambiguity during decompression. As bits are
+read from the stream, the decoder can traverse the Huffman tree from the root.
+The instant a leaf node is encountered, a symbol is definitively recognized,
+emitted, and the traversal resets to the root. No special delimiters, commas,
+or spaces are needed between symbols.
+
+4. MIN-HEAP OPTIMIZATION
+Finding the minimum-weight nodes repeatedly across k symbols would take O(k^2)
+operations using an unsorted array. By storing candidate subtrees in a Min-Heap
+(Priority Queue), finding and extracting the minimum takes O(log k) time.
+Therefore, building the entire tree of k distinct symbols requires exactly
+k - 1 merges, completing in O(k log k) time.
+
+5. CONCLUSION
+Huffman Coding forms the foundational entropy-coding step in many modern formats,
+including JPEG, MP3, GZIP, and DEFLATE. Understanding its mechanics offers deep
+insights into the interplay between data structures, algorithm design, and
+information theory.

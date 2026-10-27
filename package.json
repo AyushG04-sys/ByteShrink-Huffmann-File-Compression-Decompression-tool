@@ -1,0 +1,20 @@
+{
+  "name": "byteshrink",
+  "version": "1.0.0",
+  "description": "ByteShrink — Smart File Compression Studio. Privacy-first, offline file compression powered by Huffman Coding.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node -e \"console.log('ByteShrink server ready')\""
+  },
+  "keywords": [
+    "huffman-coding",
+    "data-compression",
+    "dsa",
+    "offline",
+    "privacy-first",
+    "cpp"
+  ],
+  "author": "ByteShrink Team",
+  "license": "MIT"
+}

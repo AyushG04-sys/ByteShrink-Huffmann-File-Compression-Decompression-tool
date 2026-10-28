@@ -79,16 +79,15 @@ HuffmanX/
 │   ├── HuffmanEncoder.cpp
 │   ├── HuffmanNode.cpp
 │   ├── HuffmanTree.cpp
-│   └── main.cpp                # Hybrid entrypoint (Desktop GUI + CLI)
-├── gui/
-│   ├── AppWindow.h / .cpp      # Win32 lifecycle, Direct3D 11, background worker thread
-│   ├── NativeFileDialog.h/.cpp # Native Windows file/folder picker integration
-│   ├── Theme.h / .cpp          # Modern Slate Dark and Crisp Light themes
-│   └── TreeRenderer.h / .cpp   # 2D interactive canvas renderer with pan/zoom/hover
-├── tests/
-│   └── test_suite.cpp          # 18 automated roundtrip and negative unit tests
-└── third_party/
-    └── imgui/                  # Dear ImGui library + Win32/DX11 backends
+│   └── main.cpp                # High-performance CLI engine entrypoint
+├── web/                        # ByteShrink Studio (Web Frontend)
+│   ├── index.html              # Retro-terminal industrial web interface
+│   ├── css/style.css           # Dark palette, orange & purple themes
+│   └── js/
+│       ├── app.js              # State manager & API bridge
+│       └── tree_canvas.js      # 2D interactive canvas tree visualizer
+└── tests/
+    └── test_suite.cpp          # 18 automated roundtrip and negative unit tests
 ```
 
 ---

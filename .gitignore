@@ -22,6 +22,5 @@ test_workspace/
 .idea/
 *.swp
 *.swo
-imgui.ini
 .DS_Store
 Thumbs.db

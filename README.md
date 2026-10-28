@@ -12,9 +12,9 @@
 
 The application operates directly on raw binary byte streams (preserving all 256 byte values from `0x00` to `0xFF`). It supports documents (`.pdf`, `.docx`, `.txt`), images (`.jpg`, `.png`, `.bmp`), video (`.mp4`), audio (`.mp3`), and general binary files, restoring the original data **byte-for-byte** with IEEE 802.3 CRC-32 integrity verification.
 
-ByteShrink provides two unified interfaces:
+ByteShrink provides two seamless interfaces:
 1. **ByteShrink Studio (Web / Local-First UI)**: A retro-terminal industrial interface featuring a dark palette (`#0B0B0E`), vivid orange (`#FF5A0A`) and purple (`#7844F9`) accents, hazard diagonal stripes, notch borders, an interactive 2D HTML5 canvas Huffman Tree visualizer with drag-to-pan and scroll-to-zoom, Welcome onboarding flow, direct `.hfx` and restored file downloads, and a zero-dependency local bridge.
-2. **ByteShrink Native Engine (C++ CLI & GUI)**: A native C++ compiled binary (`build/ByteShrink.exe`) for headless scripting, automated evaluation, and hardware-accelerated desktop rendering via Dear ImGui and Direct3D 11.
+2. **ByteShrink High-Performance CLI Engine**: A native C++ compiled binary (`build/ByteShrink.exe`) for high-throughput compression, decompression, archive inspection, and automated test evaluation.
 
 ---
 
@@ -48,8 +48,7 @@ ByteShrink provides two unified interfaces:
 | **Coding Style** | `using namespace std;` in `src/*.cpp` | Clean, student-friendly code structure ideal for college faculty evaluation. |
 | **DSA Engine** | Custom Min-Heap, Binary Tree | Educational clarity and complete control over greedy heap operations. |
 | **Web Studio UI** | HTML5, CSS3, Vanilla JavaScript | Responsive, industrial retro-terminal aesthetic with 2D HTML5 Canvas. |
-| **Local Bridge** | Node.js (Built-in `http`, `fs`, `child_process`) | Zero external npm dependencies; binds to `0.0.0.0:3000` for IPv4/IPv6 support. |
-| **Native GUI** | Dear ImGui + Direct3D 11 + Win32 | Lightweight, native desktop execution with zero external DLL runtime dependencies. |
+| **Local Bridge** | Node.js (Built-in `http`, `fs`, `child_process`) | Zero external npm dependencies; bridges web UI with native C++ CLI engine. |
 | **Integrity** | CRC-32 (Polynomial `0xEDB88320`) | Fast, collision-resistant checksum verification. |
 | **Build System** | CMake 3.20+ / MinGW Makefiles | Standardized, cross-platform build automation. |
 | **Compiler** | GCC 14.2 (UCRT64 MinGW-w64) / Clang / MSVC | High-optimization C++ compiler. |
@@ -77,7 +76,7 @@ ByteShrink/
 ├── README.md                   # This project manual
 │
 ├── src/                        # === CORE C++ HUFFMAN ENGINE (SHOW TO FACULTY) ===
-│   ├── main.cpp                # Hybrid GUI & CLI entrypoint with clean 'using namespace std;'
+│   ├── main.cpp                # High-performance C++ CLI engine entrypoint with clean 'using namespace std;'
 │   ├── HuffmanEncoder.cpp      # Two-pass streaming compression & frequency analysis
 │   ├── HuffmanDecoder.cpp      # Bitstream decompression & tree traversal
 │   ├── HuffmanTree.cpp         # Binary tree construction, min-heap merges & code generation
@@ -114,12 +113,6 @@ ByteShrink/
 │   ├── architecture.md         # Architectural tiers & design patterns
 │   ├── compression_format.md   # Exact binary specification of .hfx
 │   └── algorithm_explanation.md# Theory, mathematical proofs, and viva Q&A
-│
-├── gui/                        # Native Desktop GUI (Dear ImGui)
-│   ├── AppWindow.h / .cpp      # Desktop window lifecycle & background worker thread
-│   ├── NativeFileDialog.h/.cpp # Native Windows file/folder pickers
-│   ├── Theme.h / .cpp          # Industrial dark orange/purple themes
-│   └── TreeRenderer.h / .cpp   # ImGui 2D canvas tree renderer
 │
 ├── tests/                      # Automated Test Suite
 │   └── test_suite.cpp          # 18 automated unit and roundtrip tests
@@ -211,13 +204,13 @@ http://localhost:3000
 ```
 
 This compiles:
-- `build/ByteShrink.exe` (Main application CLI & Desktop GUI)
+- `build/ByteShrink.exe` (Main high-performance CLI engine)
 - `build/run_tests.exe` (Automated verification test runner)
 
 #### Running the Native Executable:
 ```powershell
-# Interactive Desktop GUI (Dear ImGui)
-.\build\ByteShrink.exe
+# CLI: Display Help & Usage
+.\build\ByteShrink.exe --help
 
 # CLI: Compress a document to .hfx archive
 .\build\ByteShrink.exe -c samples/sample_document.txt samples/sample_document.txt.hfx

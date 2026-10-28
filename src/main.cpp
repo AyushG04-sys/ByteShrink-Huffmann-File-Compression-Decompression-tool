@@ -1,7 +1,6 @@
 #include "HuffmanEncoder.h"
 #include "HuffmanDecoder.h"
 #include "FileUtils.h"
-#include "../gui/AppWindow.h"
 #include <iostream>
 #include <string>
 #include <iomanip>
@@ -14,7 +13,6 @@ void printHelp() {
          << "  Privacy-First Lossless File Compression (C++ DSA)\n"
          << "========================================================\n\n"
          << "Usage:\n"
-         << "  ByteShrink                     Launch Desktop Graphical User Interface\n"
          << "  ByteShrink -c <input> <output> Compress file to .hfx archive\n"
          << "  ByteShrink -d <archive> <out>  Decompress .hfx archive to original file\n"
          << "  ByteShrink -i <archive>        Inspect archive metadata and header\n"
@@ -125,13 +123,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Launch Desktop GUI Studio
-    AppWindow app;
-    if (!app.init()) {
-        cerr << "Failed to initialize GUI window and Direct3D 11 device.\n";
-        return 1;
-    }
-
-    app.run();
+    // Default: Display help and CLI syntax
+    printHelp();
     return 0;
 }

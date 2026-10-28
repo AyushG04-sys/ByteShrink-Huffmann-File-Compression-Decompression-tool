@@ -25,11 +25,14 @@ ByteShrink provides two unified interfaces:
 - **Custom Binary Compression Engine**: Pure C++ implementation of Huffman coding with bit packing (`BitWriter`) and unpacking (`BitReader`) using MSB-first bitwise stream manipulation and 64KB I/O block buffering.
 - **Complete DSA Demonstration**: Custom templated Min-Heap (`include/MinHeap.h`), greedy binary tree generation, deterministic tie-breaking, and recursive prefix-free code assignment.
 - **Welcome / Introduction Onboarding Screen**: New sessions greet users with an introduction to Huffman coding, supported formats, privacy guarantees, and a prominent **⚡ GET STARTED** button leading to the Dashboard.
-- **Algorithm Explorer & 2D Tree Visualizer**:
-  - Live 2D graphical representation of the Huffman Tree with drag-to-pan, scroll-to-zoom, branch bit labels (`0`/`1`), and node inspection tooltips.
-  - Sortable 256-symbol byte frequency table and variable-length prefix code inspector.
-  - Priority queue timeline detailing every greedy merge step.
-  - Interactive playground allowing real-time tree generation from custom user text or file byte streams.
+- **Algorithm Explorer & 2D Visualizer Suite (4 Interactive Views)**:
+  - **1. Interactive 2D Tree Visualizer**: Live graphical representation of the Huffman Tree with pan, scroll zoom, **Fit to View** auto-framing, branch bit labels (`0`/`1`), node inspection, and glowing selection rings.
+  - **2. 2D Interactive Frequency Graph**: Real-time canvas bar chart displaying symbol occurrence counts, horizontal/vertical axes, hover tooltips, and dynamic Shannon entropy curve interpretations.
+  - **3. Symbol Frequency & Prefix Code Inspector**: Comprehensive 8-column table detailing Byte (Dec), Hex, Symbol/ASCII, Frequency, Freq %, Huffman Prefix Code, Bits, and **Bit Contribution** ($f \times \text{len}$ bits).
+  - **4. Priority Queue Greedy Mergers Player**: Step-by-step playback controls (`⏮ Restart`, `◀ Prev`, `▶ Auto-Play`, `▶ Next`), animated progress track, breakdown card (Min #1, Min #2, Parent sum), and dynamic min-heap queue snapshot chips.
+  - **Dedicated Educational Explanation Panels**: Each of the 4 explorer views features a beginner-friendly explanation panel ("Understanding the Huffman Tree", "Understanding the Frequency Graph", "Understanding Symbol Frequencies and Huffman Codes", and "Understanding the Greedy Merging Process") combining foundational DSA theory with live, synchronized metrics from the user's data.
+  - **Cross-View Tri-Directional Synchronization**: Clicking any tree leaf, graph bar, or table row automatically highlights and centers the symbol across all views.
+- **Genuine, Authentic Compression Metrics**: ByteShrink calculates and reports actual compression statistics (original size, compressed size, space saved, compression ratio) derived strictly from the real output archive. It avoids misleading sliders or fake target simulations, adhering strictly to information theory.
 - **End-to-End Data Integrity**: IEEE 802.3 CRC-32 checksum calculation guarantees exact bit-for-bit file reconstruction.
 - **Security & Path Traversal Protection**: Sanitizes metadata and file paths to prevent directory climbing attacks (`../`).
 - **Safe Two-Phase Commit**: Writes to temporary files and atomically replaces destinations only upon successful validation.
@@ -189,7 +192,11 @@ http://localhost:3000
 3. You will be greeted by the **Welcome Screen** onboarding page. Click **⚡ GET STARTED** to open the Dashboard!
 4. **Compress Files**: Switch to the **Compress** tab, drag and drop any file (or browse), verify the detected file type signature, and click **START COMPRESSION**. Once complete, click **DOWNLOAD .HFX ARCHIVE** or click **DECOMPRESS THIS ARCHIVE** to test decompression immediately!
 5. **Decompress Files**: Switch to the **Decompress** tab, drop your `.hfx` file, inspect the archive header, and click **START DECOMPRESSION** to restore the original file with verified CRC-32 integrity.
-6. **Inspect Tree**: Switch to the **Tree Visualizer** tab to pan, zoom, and inspect the Huffman binary tree, symbol codes, and priority queue merges.
+6. **Algorithm Explorer**: Switch to the **Algorithm Explorer** tab to explore all 4 interactive educational subviews:
+   - **Interactive 2D Tree**: Pan, zoom, click **Fit to View** to frame the complete tree, or click any node to inspect its weight and traversal code. Read the *"Understanding the Huffman Tree"* panel directly below.
+   - **2D Frequency Graph**: Hover over bars for exact occurrence tallies, inspect the Shannon entropy curve, and read the *"Understanding the Frequency Graph"* panel.
+   - **Symbol Frequency & Codes**: Inspect the 8-column breakdown, check each symbol's exact bit contribution, and review the *"Understanding Symbol Frequencies and Huffman Codes"* panel.
+   - **Priority Queue Greedy Merges**: Use `⏮ Restart`, `◀ Prev`, `▶ Auto-Play`, and `▶ Next` to step through min-heap merges with live queue chips and read the *"Understanding the Greedy Merging Process"* panel.
 
 ---
 
@@ -306,6 +313,15 @@ When presenting this project to your college faculty or laboratory examiners, re
 
 5. **How does the decompressor know when to stop reading bits?**
    - The 23-byte header stores two crucial fields: `originalSize` (total uncompressed bytes) and `validBitsInLastByte` (how many bits in the last byte belong to the bitstream). The decoder stops as soon as `originalSize` bytes are decoded, ignoring any padding bits in the final byte.
+
+6. **Can a user dictate or force an arbitrary target compression size (e.g. 50% or 10%)?**
+   - No. Lossless algorithms like Huffman Coding are strictly deterministic and bounded by **Shannon's Source Coding Theorem** ($L_{\text{avg}} \ge H(X)$). Unlike lossy image codecs that discard visual data to hit an arbitrary target size, lossless compression must preserve every single bit. ByteShrink computes authentic compression statistics rather than presenting misleading target sliders.
+
+7. **What does the "Bit Contribution" metric ($f \times \text{len}$) represent in the Symbol Table?**
+   - It calculates the exact bit weight a symbol adds to the compressed bitstream. For example, a character occurring $5$ times with a $3$-bit code adds $5 \times 3 = 15$ bits to the payload (compared to $5 \times 8 = 40$ bits uncompressed). This demonstrates the exact savings contributed by each character.
+
+8. **How does the 2D Frequency Graph visually prove the Huffman principle?**
+   - Taller bars indicate dominant symbols. Because the priority queue extracts the smallest weights first, high-frequency symbols stay in the queue longer, end up near the top of the tree, and receive the shortest binary codes. Shorter bars get merged early and pushed deep into the tree, receiving longer binary codes.
 
 ---
 

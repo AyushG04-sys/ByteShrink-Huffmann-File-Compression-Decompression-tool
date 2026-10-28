@@ -449,6 +449,7 @@
         <!-- Explorer Sub-Navigation Tabs -->
         <div class="explorer-controls">
           <button class="btn-explorer-subtab active" data-subtab="tree">Interactive 2D Tree</button>
+          <button class="btn-explorer-subtab" data-subtab="graph">2D Frequency Graph</button>
           <button class="btn-explorer-subtab" data-subtab="symbols">Symbol Frequency & Codes</button>
           <button class="btn-explorer-subtab" data-subtab="merges">Priority Queue Greedy Merges</button>
         </div>
@@ -457,18 +458,251 @@
         <div class="explorer-subview active" id="subview-tree">
           <div class="tree-canvas-container">
             <div class="canvas-toolbar">
-              <button class="btn-canvas-tool" id="btnZoomIn">+</button>
-              <button class="btn-canvas-tool" id="btnZoomOut">−</button>
-              <button class="btn-canvas-tool" id="btnResetView">Reset View</button>
+              <button class="btn-canvas-tool" id="btnZoomIn" title="Zoom In">+</button>
+              <button class="btn-canvas-tool" id="btnZoomOut" title="Zoom Out">−</button>
+              <button class="btn-canvas-tool" id="btnResetView" title="Reset View (100% Zoom)">Reset View</button>
+              <button class="btn-canvas-tool" id="btnFitView" title="Fit Entire Tree to Canvas">Fit to View</button>
             </div>
             <div class="canvas-info-overlay">
-              <span id="canvasZoomLabel">Zoom: 100%</span> | Drag to Pan Canvas
+              <span id="canvasZoomLabel">Zoom: 100%</span> | Drag to Pan | Scroll to Zoom | Click Node to Inspect
             </div>
             <canvas id="huffmanTreeCanvas"></canvas>
           </div>
+
+          <!-- Educational Explanation Panel: Understanding the Huffman Tree -->
+          <div class="edu-panel" id="panel-edu-tree">
+            <div class="edu-panel-header">
+              <div class="edu-panel-title">
+                <span>🌳</span>
+                <span>UNDERSTANDING THE HUFFMAN TREE</span>
+              </div>
+              <div class="edu-badge" id="treeLiveSummaryBadge">Analyzing Input...</div>
+            </div>
+
+            <div class="edu-sections-grid">
+              <!-- A. What is this tree? -->
+              <div class="edu-section-card">
+                <div class="edu-section-heading">
+                  <span>📌</span> A. What is this Tree?
+                </div>
+                <div class="edu-section-body">
+                  <p>
+                    A <strong>Huffman Tree</strong> is an optimal, full binary tree used to generate variable-length prefix-free binary codes for symbols based on their statistical probabilities.
+                  </p>
+                  <p>
+                    • <strong style="color: var(--accent-orange);">Leaf Nodes (Orange Circles):</strong> Represent individual symbols / byte values from your input, weighted by their exact occurrence frequency.<br>
+                    • <strong style="color: var(--accent-purple);">Internal Nodes (Purple Circles):</strong> Synthetic parent nodes created by merging two subtrees, with weights representing their combined frequencies.<br>
+                    • <strong>Root Node (Summit):</strong> The single topmost node whose weight equals the total byte count of the input data.<br>
+                    • <strong>Binary Edges:</strong> Traversing along a left branch designates binary bit <code>0</code>, while a right branch designates binary bit <code>1</code>.
+                  </p>
+                </div>
+              </div>
+
+              <!-- B. How is the tree constructed? -->
+              <div class="edu-section-card">
+                <div class="edu-section-heading">
+                  <span>⚙️</span> B. How is the Tree Constructed?
+                </div>
+                <div class="edu-section-body">
+                  <p>Huffman coding uses a classic <strong>Greedy Algorithm</strong> with a Priority Queue (Min-Heap):</p>
+                  <ol class="edu-steps-list">
+                    <li><strong>Frequency Analysis:</strong> Scan the entire input and count the occurrence frequency of each unique byte.</li>
+                    <li><strong>Leaf Node Creation:</strong> Create a standalone leaf node for each distinct symbol with weight = frequency.</li>
+                    <li><strong>Priority Queue Seeding:</strong> Insert all leaf nodes into a min-heap ordered ascendingly by weight.</li>
+                    <li><strong>Extract Minimums:</strong> Extract the two nodes with the smallest weights (Min #1 and Min #2).</li>
+                    <li><strong>Combine into Parent:</strong> Construct a new parent node with weight = <code>Min #1 + Min #2</code>, assigning Min #1 to the left and Min #2 to the right.</li>
+                    <li><strong>Re-insert:</strong> Insert the new parent back into the priority queue.</li>
+                    <li><strong>Terminate at Root:</strong> Repeat steps 4–6 until exactly one node remains: the tree root.</li>
+                  </ol>
+                </div>
+              </div>
+
+              <!-- C. How do we obtain Huffman codes? -->
+              <div class="edu-section-card">
+                <div class="edu-section-heading">
+                  <span>🏷️</span> C. How Do We Obtain Huffman Codes?
+                </div>
+                <div class="edu-section-body">
+                  <p>
+                    To find the binary code for any symbol, start at the <strong>Root</strong> and trace the unique path down to that symbol's <strong>Leaf Node</strong>.
+                  </p>
+                  <div class="edu-example-callout">
+                    <strong>Illustrative Example:</strong> If the path from root to symbol traverses <em>Left → Right → Left</em>, its assigned code is <code>010</code>. (Actual codes depend on tree topology and tie-breaking).
+                  </div>
+                  <p>
+                    <strong>Prefix-Free Guarantee:</strong> Because symbols reside exclusively at leaf nodes, no valid code word can ever be a prefix of another code word. This enables instantaneous, unambiguous decoding without delimiter tokens.
+                  </p>
+                </div>
+              </div>
+
+              <!-- D. How does this help compression? -->
+              <div class="edu-section-card">
+                <div class="edu-section-heading">
+                  <span>📉</span> D. How Does This Help Compression?
+                </div>
+                <div class="edu-section-body">
+                  <p>
+                    Standard uncompressed text stores every character in a fixed 8 bits (1 byte). Huffman Coding assigns <strong>shorter bit strings (1 to 4 bits)</strong> to high-frequency symbols and longer bit strings to rare symbols.
+                  </p>
+                  <p>
+                    Because the most common symbols dominate the file, the weighted average code length drops well below 8 bits/symbol, significantly shrinking raw payload size.
+                  </p>
+                  <p style="font-size: 12.5px; color: var(--text-muted); border-top: 1px solid var(--border-subtle); padding-top: 8px;">
+                    ⚠️ <em>Archive Overhead Notice:</em> A valid archive also requires a 23-byte header and a serialized frequency table to reconstruct the tree during decompression. Files that are already compressed or have high entropy will not compress further.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- E. Explain the Current Tree (Dynamic Live Data) -->
+            <div class="edu-live-card">
+              <div class="edu-live-header">
+                <div class="edu-live-title">
+                  <span>🔍</span> E. Live Analysis of the Current Visualized Tree
+                </div>
+                <span class="edu-badge" id="treeLiveStatusBadge">Live Synchronized</span>
+              </div>
+
+              <div class="edu-live-grid">
+                <div class="edu-live-stat">
+                  <div class="edu-live-stat-label">Total Bytes Analyzed</div>
+                  <div class="edu-live-stat-val" id="treeLiveTotalBytes">-</div>
+                </div>
+                <div class="edu-live-stat">
+                  <div class="edu-live-stat-label">Distinct Symbols (Leaves)</div>
+                  <div class="edu-live-stat-val" id="treeLiveDistinct">-</div>
+                </div>
+                <div class="edu-live-stat">
+                  <div class="edu-live-stat-label">Root Node Weight</div>
+                  <div class="edu-live-stat-val" id="treeLiveRootWeight" style="color: var(--accent-orange);">-</div>
+                </div>
+                <div class="edu-live-stat">
+                  <div class="edu-live-stat-label">Max Code Length (Depth)</div>
+                  <div class="edu-live-stat-val" id="treeLiveMaxDepth" style="color: var(--accent-purple);">-</div>
+                </div>
+              </div>
+
+              <div class="edu-live-node-box" id="treeLiveNodeInspector">
+                <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">
+                  💡 Click any node or leaf in the canvas above to inspect its exact weight, parent/child relationships, and generated binary path.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Subview 2: Symbol & Code Table -->
+        <!-- Subview 2: 2D Interactive Frequency Graph (Tab 2) -->
+        <div class="explorer-subview" id="subview-graph" style="display: none;">
+          <div class="graph-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+              <div style="font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--accent-orange);">
+                📊 2D SYMBOL FREQUENCY DISTRIBUTION (INTERACTIVE GRAPH)
+              </div>
+              <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">
+                Hover over bars for exact stats | Click bar to highlight symbol in tree & table
+              </div>
+            </div>
+            <div class="graph-canvas-wrapper">
+              <canvas id="frequencyGraphCanvas"></canvas>
+            </div>
+            <div class="graph-explanation-panel">
+              <div class="graph-stats-pills" id="graphStatsPills">
+                <!-- Dynamically generated metrics pills -->
+              </div>
+              <div class="graph-explanation-narrative" id="graphExplanationText">
+                <!-- Dynamically generated contextual explanation -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Educational Explanation Panel: Understanding the Frequency Graph -->
+          <div class="edu-panel" id="panel-edu-graph">
+            <div class="edu-panel-header">
+              <div class="edu-panel-title">
+                <span>📊</span>
+                <span>UNDERSTANDING THE FREQUENCY GRAPH</span>
+              </div>
+              <div class="edu-badge" id="graphLiveBadge">Distribution Analysis</div>
+            </div>
+
+            <div class="edu-sections-grid">
+              <div class="edu-section-card">
+                <div class="edu-section-heading">
+                  <span>📐</span> What the Graph Represents
+                </div>
+                <div class="edu-section-body">
+                  <p>
+                    • <strong>Symbol Frequency:</strong> The exact count of times each specific byte (0–255) appears in the analyzed file or text.<br>
+                    • <strong>Horizontal Axis (X-Axis):</strong> The distinct symbols / byte values identified in the input, sorted descending by count.<br>
+                    • <strong>Vertical Axis (Y-Axis):</strong> The frequency count (number of occurrences), scaled from zero to the maximum occurrence in the input.<br>
+                    • <strong>Plotted Bars:</strong> Each vertical bar represents one unique symbol. Taller bars indicate dominant characters; shorter bars indicate rare characters.
+                  </p>
+                </div>
+              </div>
+
+              <div class="edu-section-card">
+                <div class="edu-section-heading">
+                  <span>⚡</span> Generation & Influence on Huffman Coding
+                </div>
+                <div class="edu-section-body">
+                  <p>
+                    <strong>How It's Generated:</strong> ByteShrink performs a single-pass scan over the input array, accumulating byte tallies in a 256-bucket histogram.
+                  </p>
+                  <p>
+                    <strong>Why Frequencies Differ:</strong> Natural languages, source code, and structured formats inherently favor specific characters (spaces, vowels, common syntax tokens) over rare characters.
+                  </p>
+                  <p>
+                    <strong>Huffman Impact:</strong> Symbols with taller bars stay in the priority queue longer and are merged later, placing them near the top of the tree with <em>short binary codes</em>. Shorter bars are merged immediately and pushed deep into the tree with <em>longer binary codes</em>.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dynamic Live Contextual Information -->
+            <div class="edu-live-card">
+              <div class="edu-live-header">
+                <div class="edu-live-title">
+                  <span>📈</span> Live Contextual Distribution Analysis
+                </div>
+                <span class="edu-badge" id="graphEntropyBadge">Entropy: -</span>
+              </div>
+
+              <div class="edu-live-grid">
+                <div class="edu-live-stat">
+                  <div class="edu-live-stat-label">Total Analyzed</div>
+                  <div class="edu-live-stat-val" id="graphEduTotalBytes">-</div>
+                </div>
+                <div class="edu-live-stat">
+                  <div class="edu-live-stat-label">Distinct Symbols</div>
+                  <div class="edu-live-stat-val" id="graphEduDistinct">-</div>
+                </div>
+                <div class="edu-live-stat">
+                  <div class="edu-live-stat-label">Most Frequent Symbol</div>
+                  <div class="edu-live-stat-val" id="graphEduMostFreq" style="color: var(--accent-orange);">-</div>
+                </div>
+                <div class="edu-live-stat">
+                  <div class="edu-live-stat-label">Least Frequent Symbol</div>
+                  <div class="edu-live-stat-val" id="graphEduLeastFreq" style="color: var(--accent-purple);">-</div>
+                </div>
+              </div>
+
+              <div class="target-explanation-box" style="margin-top: 10px; border-left-color: var(--accent-orange);">
+                <div class="target-explanation-title">Data Distribution Interpretation</div>
+                <div class="target-explanation-text" id="graphEduNarrative">
+                  Enter text or upload a file to analyze its frequency distribution.
+                </div>
+              </div>
+
+              <div class="edu-live-node-box" id="graphEduSelectedDetail" style="margin-top: 12px;">
+                <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">
+                  💡 Hover over or click any bar above to inspect its exact frequency, percentage, and assigned Huffman code.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subview 3: Symbol & Code Table (Tab 3) -->
         <div class="explorer-subview" id="subview-symbols" style="display: none;">
           <div class="activity-table-wrapper" style="max-height: 480px; overflow-y: auto;">
             <table class="activity-table">
@@ -478,8 +712,10 @@
                   <th>HEX</th>
                   <th>SYMBOL / ASCII</th>
                   <th>FREQUENCY</th>
+                  <th>FREQ %</th>
                   <th>HUFFMAN PREFIX CODE</th>
                   <th>BITS</th>
+                  <th>BIT CONTRIBUTION</th>
                 </tr>
               </thead>
               <tbody id="symbolTableBody">
@@ -487,11 +723,155 @@
               </tbody>
             </table>
           </div>
+
+          <!-- Educational Explanation Panel: Understanding Symbol Frequencies and Huffman Codes -->
+          <div class="edu-panel" id="panel-edu-symbols">
+            <div class="edu-panel-header">
+              <div class="edu-panel-title purple">
+                <span>📋</span>
+                <span>UNDERSTANDING SYMBOL FREQUENCIES AND HUFFMAN CODES</span>
+              </div>
+              <div class="edu-badge" id="symbolsLiveBadge">Prefix-Free Codebook</div>
+            </div>
+
+            <div class="edu-sections-grid">
+              <div class="edu-section-card">
+                <div class="edu-section-heading purple">
+                  <span>📖</span> Column Definitions & Metrics
+                </div>
+                <div class="edu-section-body">
+                  <p>
+                    • <strong>Symbol / Byte (Dec / Hex):</strong> The 8-bit byte value (0–255) represented as a character or hex identifier.<br>
+                    • <strong>Frequency & Freq %:</strong> Total occurrence count and its percentage of the total file bytes.<br>
+                    • <strong>Huffman Prefix Code:</strong> The binary sequence produced by traversing from the root to this symbol's leaf.<br>
+                    • <strong>Code Length (Bits):</strong> The exact bit length of the assigned variable-length code.<br>
+                    • <strong>Bit Contribution:</strong> Total bits contributed to the compressed payload, calculated as <code>Frequency × Code Length</code>.
+                  </p>
+                  <div class="edu-example-callout">
+                    <strong>Illustrative Example:</strong> If a symbol appears <code>5</code> times and receives a <code>3-bit</code> code (e.g. <code>010</code>), its encoded occurrences contribute <code>5 × 3 = 15 bits</code> (under 2 bytes) to the payload, compared to <code>5 × 8 = 40 bits</code> (5 bytes) uncompressed.
+                  </div>
+                </div>
+              </div>
+
+              <div class="edu-section-card">
+                <div class="edu-section-heading purple">
+                  <span>🔬</span> Contextual Codebook Analysis & Byte-Level Engine
+                </div>
+                <div class="edu-section-body">
+                  <p>
+                    <strong>Byte-Level Architecture:</strong> ByteShrink operates at the byte level ($0$ to $255$), treating inputs as binary byte streams. This preserves ASCII, UTF-8 multilingual characters, punctuation, whitespace, and compiled binaries with 100% lossless fidelity.
+                  </p>
+                  <p>
+                    <strong>Tree & Graph Relationship:</strong> Every code in this table corresponds to an exact root-to-leaf path in the 2D Tree. Taller bars in the Frequency Graph receive shorter codes at the top of this table.
+                  </p>
+                  <p>
+                    <strong>Click to Cross-Highlight:</strong> Click any row to automatically isolate that symbol in the 2D Frequency Graph and zoom to its leaf node in the 2D Tree.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Live Dynamic Codebook Insights -->
+            <div class="edu-live-card" style="border-color: var(--accent-purple);">
+              <div class="edu-live-header">
+                <div class="edu-live-title" style="color: var(--accent-purple);">
+                  <span>📊</span> Live Codebook Insights
+                </div>
+                <span class="edu-badge" id="symbolsCodebookBadge">Optimal Prefix-Free</span>
+              </div>
+
+              <div class="edu-live-grid">
+                <div class="edu-live-stat">
+                  <div class="edu-live-stat-label">Total Analyzed</div>
+                  <div class="edu-live-stat-val" id="symbolsEduTotalBytes">-</div>
+                </div>
+                <div class="edu-live-stat">
+                  <div class="edu-live-stat-label">Shortest Code</div>
+                  <div class="edu-live-stat-val" id="symbolsEduShortest" style="color: var(--accent-green);">-</div>
+                </div>
+                <div class="edu-live-stat">
+                  <div class="edu-live-stat-label">Longest Code</div>
+                  <div class="edu-live-stat-val" id="symbolsEduLongest" style="color: var(--accent-orange);">-</div>
+                </div>
+                <div class="edu-live-stat">
+                  <div class="edu-live-stat-label">Average Code Length</div>
+                  <div class="edu-live-stat-val" id="symbolsEduAvgBits" style="color: var(--accent-purple);">-</div>
+                </div>
+              </div>
+
+              <div class="target-explanation-box" style="margin-top: 10px; border-left-color: var(--accent-purple);">
+                <div class="target-explanation-title" style="color: var(--accent-purple);">Efficiency & Shannon Bound Comparison</div>
+                <div class="target-explanation-text" id="symbolsEduAnalysis">
+                  Awaiting input data.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Subview 3: Greedy Priority Queue Merges -->
+        <!-- Subview 4: Greedy Priority Queue Merges (Tab 4) -->
         <div class="explorer-subview" id="subview-merges" style="display: none;">
-          <div class="activity-table-wrapper" style="max-height: 480px; overflow-y: auto;">
+          <!-- Step-by-Step Interactive Player Toolbar -->
+          <div class="merge-player-toolbar">
+            <div class="merge-player-btns">
+              <button class="btn-merge-step" id="btnMergeRestart" title="Restart to Step 1">⏮ Restart</button>
+              <button class="btn-merge-step" id="btnMergePrev" title="Previous Merge Step">◀ Prev Step</button>
+              <button class="btn-merge-step btn-merge-play" id="btnMergePlay" title="Auto-Play Merges">▶ Auto-Play</button>
+              <button class="btn-merge-step" id="btnMergeNext" title="Next Merge Step">▶ Next Step</button>
+            </div>
+            <div class="merge-step-badge" id="mergeStepBadge">Step 1 of 1</div>
+          </div>
+
+          <!-- Merge Progress Track -->
+          <div class="merge-progress-track">
+            <div class="merge-progress-bar" id="mergeProgressBar"></div>
+          </div>
+
+          <!-- Step Breakdown Card -->
+          <div class="merge-breakdown-card" id="mergeBreakdownCard">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <div style="font-family: var(--font-mono); font-size: 13.5px; font-weight: 700; color: var(--accent-orange);" id="mergeStepHeading">
+                STEP 1: INITIAL MIN-HEAP EXTRACTIONS
+              </div>
+              <span class="target-status-badge badge-neutral" id="mergeStepStatusBadge">In Progress</span>
+            </div>
+
+            <div class="merge-nodes-grid">
+              <div class="merge-node-box min-left">
+                <div class="merge-node-label">Min Node #1 (Left Child)</div>
+                <div class="merge-node-symbol" id="mergeLeftSymbol" style="color: var(--accent-orange);">-</div>
+                <div class="merge-node-freq" id="mergeLeftFreq">Weight: -</div>
+              </div>
+              <div class="merge-node-box min-right">
+                <div class="merge-node-label">Min Node #2 (Right Child)</div>
+                <div class="merge-node-symbol" id="mergeRightSymbol" style="color: var(--accent-purple);">-</div>
+                <div class="merge-node-freq" id="mergeRightFreq">Weight: -</div>
+              </div>
+              <div class="merge-node-box combined-parent">
+                <div class="merge-node-label">Created Parent Node</div>
+                <div class="merge-node-symbol" id="mergeParentSymbol" style="color: var(--accent-green);">-</div>
+                <div class="merge-node-freq" id="mergeParentFreq">Combined: -</div>
+              </div>
+            </div>
+
+            <div style="margin-top: 14px;">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); text-transform: uppercase;">
+                Priority Queue Contents (Remaining Nodes in Heap)
+              </div>
+              <div class="queue-chips-container" id="mergeQueueChips">
+                <!-- Dynamically populated queue chips -->
+              </div>
+            </div>
+
+            <div class="target-explanation-box" style="margin-top: 14px; border-left-color: var(--accent-orange);">
+              <div class="target-explanation-title">Greedy Algorithm Step Explanation</div>
+              <div class="target-explanation-text" id="mergeStepExplanation">
+                Extracting the two minimum frequency subtrees and creating a new combined parent node.
+              </div>
+            </div>
+          </div>
+
+          <div class="activity-table-wrapper" style="max-height: 380px; overflow-y: auto;">
             <table class="activity-table">
               <thead>
                 <tr>
@@ -506,6 +886,69 @@
                 <!-- Dynamically populated -->
               </tbody>
             </table>
+          </div>
+
+          <!-- Educational Explanation Panel: Understanding the Greedy Merging Process -->
+          <div class="edu-panel" id="panel-edu-merges">
+            <div class="edu-panel-header">
+              <div class="edu-panel-title">
+                <span>🔀</span>
+                <span>UNDERSTANDING THE GREEDY MERGING PROCESS</span>
+              </div>
+              <div class="edu-badge" id="mergesLiveBadge">Min-Heap Operations</div>
+            </div>
+
+            <div class="edu-sections-grid">
+              <div class="edu-section-card">
+                <div class="edu-section-heading">
+                  <span>⚖️</span> The Priority Queue & Greedy Choice
+                </div>
+                <div class="edu-section-body">
+                  <p>
+                    The core of Huffman's algorithm is the <strong>Greedy Priority Queue</strong> (Min-Heap). At every iteration, it extracts the two nodes with the smallest weights in $O(\log k)$ time.
+                  </p>
+                  <p>
+                    • <strong>Leaf Nodes:</strong> Represent initial distinct input symbols.<br>
+                    • <strong>Internal Nodes:</strong> Represent previously combined subtrees.<br>
+                    • <strong>Greedy Choice Property:</strong> Combining the two smallest weights first ensures that rare symbols accumulate more edges (longer codes), while frequent symbols remain closer to the root (shorter codes), minimizing the total weighted path length $\sum (f_i \times d_i)$.<br>
+                    • <strong>Deterministic Tie-Breaking:</strong> When two nodes share identical weights, ByteShrink breaks ties deterministically using their insertion ID, guaranteeing reproducible archives across compressor and decompressor.
+                  </p>
+                </div>
+              </div>
+
+              <div class="edu-section-card">
+                <div class="edu-section-heading">
+                  <span>🔄</span> What Happens at Every Merge Step
+                </div>
+                <div class="edu-section-body">
+                  <ol class="edu-steps-list">
+                    <li><strong>Inspect Queue:</strong> Inspect the current priority queue sorted ascendingly by node weight.</li>
+                    <li><strong>Pop Two Minimums:</strong> Extract Node #1 (smallest weight) and Node #2 (second smallest weight).</li>
+                    <li><strong>Sum Weights:</strong> Calculate the parent weight: <code>Weight = Min #1 + Min #2</code>.</li>
+                    <li><strong>Assemble Subtree:</strong> Set Min #1 as left child (bit 0) and Min #2 as right child (bit 1).</li>
+                    <li><strong>Re-insert Parent:</strong> Push the new parent node back into the priority queue.</li>
+                    <li><strong>Check Remaining:</strong> If more than 1 node remains, repeat. If exactly 1 node remains, it is the root of the finished Huffman tree!</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+
+            <!-- Live Step Walkthrough -->
+            <div class="edu-live-card">
+              <div class="edu-live-header">
+                <div class="edu-live-title">
+                  <span>📋</span> Live Step Walkthrough & Heap Contents
+                </div>
+                <span class="edu-badge" id="mergesStepIndicatorBadge">Step 1</span>
+              </div>
+
+              <div class="target-explanation-box" style="margin-top: 6px; border-left-color: var(--accent-orange);">
+                <div class="target-explanation-title">Current Step Explanation</div>
+                <div class="target-explanation-text" id="mergesEduStepWalkthrough">
+                  Select a step using the playback toolbar above or click any row in the merge history table.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

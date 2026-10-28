@@ -12,16 +12,19 @@ class HuffmanTreeCanvas {
 
     // View transform state
     this.scale = 1.0;
-    this.minScale = 0.25;
-    this.maxScale = 3.0;
+    this.minScale = 0.15;
+    this.maxScale = 4.0;
     this.offsetX = 0;
     this.offsetY = 40;
 
     // Interaction state
     this.isDragging = false;
+    this.hasDragged = false;
     this.startX = 0;
     this.startY = 0;
     this.hoveredNode = null;
+    this.selectedNode = null;
+    this.onNodeClick = null;
 
     // Tree data
     this.treeData = null;
@@ -60,6 +63,7 @@ class HuffmanTreeCanvas {
     // Mouse drag for panning
     this.canvas.addEventListener('mousedown', (e) => {
       this.isDragging = true;
+      this.hasDragged = false;
       this.startX = e.clientX - this.offsetX;
       this.startY = e.clientY - this.offsetY;
       this.canvas.style.cursor = 'grabbing';
@@ -67,6 +71,11 @@ class HuffmanTreeCanvas {
 
     window.addEventListener('mousemove', (e) => {
       if (this.isDragging) {
+        const dx = Math.abs(e.clientX - (this.startX + this.offsetX));
+        const dy = Math.abs(e.clientY - (this.startY + this.offsetY));
+        if (dx > 3 || dy > 3) {
+          this.hasDragged = true;
+        }
         this.offsetX = e.clientX - this.startX;
         this.offsetY = e.clientY - this.startY;
         this.render();
@@ -79,6 +88,32 @@ class HuffmanTreeCanvas {
       if (this.isDragging) {
         this.isDragging = false;
         this.canvas.style.cursor = 'grab';
+      }
+    });
+
+    // Node click to select & inspect
+    this.canvas.addEventListener('click', (e) => {
+      if (this.hasDragged) return;
+      const rect = this.canvas.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left - this.offsetX) / this.scale;
+      const mouseY = (e.clientY - rect.top - this.offsetY) / this.scale;
+
+      let clicked = null;
+      for (let i = this.nodes.length - 1; i >= 0; i--) {
+        const n = this.nodes[i];
+        const r = n.isLeaf ? 24 : 20;
+        const dist = Math.hypot(mouseX - n.x, mouseY - n.y);
+        if (dist <= r) {
+          clicked = n;
+          break;
+        }
+      }
+
+      this.selectedNode = clicked;
+      this.render();
+
+      if (clicked && typeof this.onNodeClick === 'function') {
+        this.onNodeClick(clicked);
       }
     });
 
@@ -186,6 +221,58 @@ class HuffmanTreeCanvas {
     }
     this.updateZoomLabel();
     this.render();
+  }
+
+  fitToView() {
+    if (!this.nodes || this.nodes.length === 0) return;
+
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+
+    for (const n of this.nodes) {
+      const halfW = n.isLeaf ? 30 : 25;
+      const halfH = n.isLeaf ? 26 : 25;
+      minX = Math.min(minX, n.x - halfW);
+      maxX = Math.max(maxX, n.x + halfW);
+      minY = Math.min(minY, n.y - halfH);
+      maxY = Math.max(maxY, n.y + halfH);
+    }
+
+    const treeW = Math.max(maxX - minX, 80);
+    const treeH = Math.max(maxY - minY, 80);
+
+    const pad = 50;
+    const scaleX = (this.width - pad * 2) / treeW;
+    const scaleY = (this.height - pad * 2) / treeH;
+
+    // Constrain scale between minScale and 1.8 so small trees don't balloon unnaturally
+    this.scale = Math.min(Math.max(Math.min(scaleX, scaleY), this.minScale), 1.7);
+
+    const treeMidX = (minX + maxX) / 2;
+    const treeMidY = (minY + maxY) / 2;
+
+    this.offsetX = this.width / 2 - treeMidX * this.scale;
+    this.offsetY = this.height / 2 - treeMidY * this.scale;
+
+    this.updateZoomLabel();
+    this.render();
+  }
+
+  selectNodeByByte(byteVal) {
+    const node = this.nodes.find(n => n.isLeaf && n.byteVal === byteVal);
+    if (node) {
+      this.selectedNode = node;
+      // Check if node is outside current viewport and pan if needed
+      const screenX = node.x * this.scale + this.offsetX;
+      const screenY = node.y * this.scale + this.offsetY;
+      if (screenX < 60 || screenX > this.width - 60 || screenY < 60 || screenY > this.height - 60) {
+        this.offsetX = this.width / 2 - node.x * this.scale;
+        this.offsetY = this.height / 2 - node.y * this.scale;
+      }
+      this.render();
+      return node;
+    }
+    return null;
   }
 
   updateZoomLabel() {
@@ -413,8 +500,25 @@ class HuffmanTreeCanvas {
 
   drawNode(ctx, node) {
     const isHovered = this.hoveredNode === node;
+    const isSelected = this.selectedNode === node;
 
     ctx.save();
+
+    // Draw active selection indicator ring if selected
+    if (isSelected) {
+      ctx.save();
+      ctx.beginPath();
+      if (node.isLeaf) {
+        ctx.roundRect(node.x - 29, node.y - 26, 58, 52, 9);
+      } else {
+        ctx.arc(node.x, node.y, 26, 0, Math.PI * 2);
+      }
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = node.isLeaf ? '#FF5A0A' : '#9A6CF9';
+      ctx.stroke();
+      ctx.restore();
+    }
+
     if (node.isLeaf) {
       // Leaf Node: Orange accent box with symbol and frequency
       const w = 48;

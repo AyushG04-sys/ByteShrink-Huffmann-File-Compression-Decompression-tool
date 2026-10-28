@@ -17,7 +17,19 @@
     currentDecompressFile: null,
     currentDecompressHeader: null,
     currentDecompressResult: null,
-    treeCanvas: null
+    treeCanvas: null,
+    selectedTreeNode: null,
+    currentExplorerData: null,
+    mergeState: {
+      currentStep: 1,
+      totalSteps: 1,
+      isPlaying: false,
+      timer: null,
+      merges: []
+    },
+    graphHoveredByte: null,
+    graphBars: [],
+    selectedSymbolByte: null
   };
 
   // Supported Extensions Mapping
@@ -119,11 +131,17 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     // Handle explorer canvas resize on entering explorer tab
-    if (tabId === 'explorer' && state.treeCanvas) {
+    if (tabId === 'explorer') {
       setTimeout(() => {
-        state.treeCanvas.resize();
-        state.treeCanvas.render();
-      }, 50);
+        if (state.treeCanvas) {
+          state.treeCanvas.resize();
+          state.treeCanvas.render();
+        }
+        const graphSubview = document.getElementById('subview-graph');
+        if (graphSubview && graphSubview.style.display !== 'none') {
+          drawFrequencyGraph();
+        }
+      }, 60);
     }
   }
 
@@ -433,7 +451,7 @@
       document.getElementById('statRatio').textContent = `${res.ratio}:1`;
       barFill.textContent = `${percentOfOriginal}% of original`;
       barFill.style.background = 'linear-gradient(90deg, var(--accent-orange), var(--accent-orange-hover))';
-      diagnosticText.textContent = `Lossless compression succeeded. File bytes encoded with prefix-free Huffman trees without loss of information.`;
+      diagnosticText.innerHTML = `Lossless Huffman compression reduced file payload by <strong>${formatBytes(res.spaceSaved)}</strong> (${Math.abs(res.percentChange)}% saved). Optimal variable-length prefix codes were assigned to frequent symbols without loss of information.`;
     } else {
       const addedBytes = Math.abs(res.spaceSaved);
       statSpaceSaved.textContent = `-${formatBytes(addedBytes)} (+${Math.abs(res.percentChange)}% overhead)`;
@@ -441,7 +459,7 @@
       document.getElementById('statRatio').textContent = `${res.ratio}:1 (Expanded)`;
       barFill.textContent = `100% + overhead`;
       barFill.style.background = 'linear-gradient(90deg, #D44100, var(--accent-orange))';
-      diagnosticText.innerHTML = `<strong>Shannon Entropy Notice:</strong> This input format (${getExtension(res.originalName).toUpperCase()}) already uses internal compression (e.g. DEFLATE/DCT). Its byte distribution has maximum entropy (~8 bits/byte), so Huffman coding cannot shrink it further. Storing the tree table adds ${formatBytes(addedBytes)} overhead. This is an honest, expected characteristic of lossless data compression.`;
+      diagnosticText.innerHTML = `<strong>Shannon Entropy Notice:</strong> This input format (${getExtension(res.originalName).toUpperCase()}) already uses internal compression or has high entropy (~8 bits/byte). Lossless Huffman coding cannot shrink it further, and storing the Huffman tree table adds ${formatBytes(addedBytes)} container overhead. This is an honest, expected characteristic of lossless data compression.`;
     }
 
     // Scroll to results
@@ -764,6 +782,24 @@
   function initExplorer() {
     state.treeCanvas = new HuffmanTreeCanvas('huffmanTreeCanvas');
 
+    // Fit to view button
+    const btnFitView = document.getElementById('btnFitView');
+    if (btnFitView) {
+      btnFitView.addEventListener('click', () => {
+        if (state.treeCanvas) state.treeCanvas.fitToView();
+      });
+    }
+
+    // Node click callback: selects symbol in table and graph, zooms to tree node, updates tree explanation
+    state.treeCanvas.onNodeClick = (node) => {
+      state.selectedTreeNode = node;
+      if (node && node.isLeaf && typeof node.byteVal === 'number') {
+        selectSymbol(node.byteVal);
+      } else {
+        updateTreeExplanation(node);
+      }
+    };
+
     const btnUpdate = document.getElementById('btnUpdateExplorer');
     const inputCustom = document.getElementById('explorerCustomText');
 
@@ -788,6 +824,33 @@
     if (btnZoomOut) btnZoomOut.addEventListener('click', () => state.treeCanvas.zoom(0.8));
     if (btnResetView) btnResetView.addEventListener('click', () => state.treeCanvas.resetView());
 
+    // Merge player controls
+    const btnMergeRestart = document.getElementById('btnMergeRestart');
+    const btnMergePrev = document.getElementById('btnMergePrev');
+    const btnMergePlay = document.getElementById('btnMergePlay');
+    const btnMergeNext = document.getElementById('btnMergeNext');
+
+    if (btnMergeRestart) btnMergeRestart.addEventListener('click', () => goToMergeStep(1));
+    if (btnMergePrev) btnMergePrev.addEventListener('click', () => goToMergeStep(state.mergeState.currentStep - 1));
+    if (btnMergePlay) btnMergePlay.addEventListener('click', toggleMergePlay);
+    if (btnMergeNext) btnMergeNext.addEventListener('click', () => goToMergeStep(state.mergeState.currentStep + 1));
+
+    // 2D Frequency Graph mouse interactions
+    const graphCanvas = document.getElementById('frequencyGraphCanvas');
+    if (graphCanvas) {
+      graphCanvas.addEventListener('mousemove', handleGraphMouseMove);
+      graphCanvas.addEventListener('mouseleave', handleGraphMouseLeave);
+      graphCanvas.addEventListener('click', handleGraphClick);
+    }
+
+    // Window resize listener to redraw graph
+    window.addEventListener('resize', () => {
+      const graphSubview = document.getElementById('subview-graph');
+      if (graphSubview && graphSubview.style.display !== 'none') {
+        drawFrequencyGraph();
+      }
+    });
+
     // Subtab switching
     const subtabs = document.querySelectorAll('.btn-explorer-subtab');
     subtabs.forEach(tab => {
@@ -798,12 +861,15 @@
         tab.classList.add('active');
 
         document.getElementById('subview-tree').style.display = (subtabId === 'tree') ? 'block' : 'none';
+        document.getElementById('subview-graph').style.display = (subtabId === 'graph') ? 'block' : 'none';
         document.getElementById('subview-symbols').style.display = (subtabId === 'symbols') ? 'block' : 'none';
         document.getElementById('subview-merges').style.display = (subtabId === 'merges') ? 'block' : 'none';
 
         if (subtabId === 'tree') {
           state.treeCanvas.resize();
           state.treeCanvas.render();
+        } else if (subtabId === 'graph') {
+          drawFrequencyGraph();
         }
       });
     });
@@ -832,14 +898,29 @@
   }
 
   function buildExplorerFromBytes(bytes, label) {
+    if (!bytes || bytes.length === 0) {
+      bytes = new Uint8Array([65]); // Fallback to 'A'
+    }
+
+    const totalBytes = bytes.length;
+
     // 1. Calculate frequency distribution
     const freqs = new Map();
-    for (let i = 0; i < bytes.length; i++) {
+    for (let i = 0; i < totalBytes; i++) {
       const b = bytes[i];
       freqs.set(b, (freqs.get(b) || 0) + 1);
     }
 
-    // 2. Build Min-Heap and track greedy merge steps
+    // 2. Calculate Shannon Entropy H = -sum(p * log2(p))
+    let entropy = 0;
+    for (const [_, freq] of freqs.entries()) {
+      const p = freq / totalBytes;
+      if (p > 0) {
+        entropy -= p * Math.log2(p);
+      }
+    }
+
+    // 3. Build Min-Heap and track greedy merge steps
     const heap = [];
     let idCounter = 1;
 
@@ -847,7 +928,7 @@
       heap.push({
         id: idCounter++,
         byteVal: byteVal,
-        symbol: String.fromCharCode(byteVal),
+        symbol: formatChar(byteVal),
         freq: freq,
         isLeaf: true,
         left: null,
@@ -855,7 +936,7 @@
       });
     }
 
-    // Min-Heap sort comparator
+    // Min-Heap sort comparator (weight ascending, then id ascending)
     const sortHeap = () => heap.sort((a, b) => (a.freq === b.freq ? a.id - b.id : a.freq - b.freq));
     sortHeap();
 
@@ -876,21 +957,36 @@
         right: right
       };
 
-      merges.push({
-        step: stepNum++,
-        leftName: left.isLeaf ? `'${formatChar(left.byteVal)}' (f:${left.freq})` : `Internal #${left.id} (f:${left.freq})`,
-        rightName: right.isLeaf ? `'${formatChar(right.byteVal)}' (f:${right.freq})` : `Internal #${right.id} (f:${right.freq})`,
-        combinedFreq: combinedFreq,
-        action: `Combined min nodes into parent #${parent.id} (weight: ${combinedFreq})`
-      });
-
       heap.push(parent);
       sortHeap();
+
+      merges.push({
+        step: stepNum++,
+        leftNode: left,
+        rightNode: right,
+        parentNode: parent,
+        leftName: left.isLeaf ? `'${formatChar(left.byteVal)}' (w:${left.freq})` : `Node #${left.id} (w:${left.freq})`,
+        rightName: right.isLeaf ? `'${formatChar(right.byteVal)}' (w:${right.freq})` : `Node #${right.id} (w:${right.freq})`,
+        leftSymbol: left.isLeaf ? formatChar(left.byteVal) : `Node #${left.id}`,
+        rightSymbol: right.isLeaf ? formatChar(right.byteVal) : `Node #${right.id}`,
+        leftFreq: left.freq,
+        rightFreq: right.freq,
+        parentSymbol: `Parent #${parent.id}`,
+        combinedFreq: combinedFreq,
+        action: `Extracted min subtrees [${left.isLeaf ? `'${formatChar(left.byteVal)}'` : `#${left.id}`}] (w:${left.freq}) and [${right.isLeaf ? `'${formatChar(right.byteVal)}'` : `#${right.id}`}] (w:${right.freq}) → created Parent #${parent.id} (w:${combinedFreq})`,
+        explanation: `Greedy choice: Extracted two lowest-weight nodes (${left.freq} and ${right.freq}) from priority queue. Formed parent #${parent.id} with weight ${combinedFreq} and re-inserted into min-heap.`,
+        queueSnapshot: heap.map(node => ({
+          id: node.id,
+          name: node.isLeaf ? `'${formatChar(node.byteVal)}'` : `Node #${node.id}`,
+          freq: node.freq,
+          isLeaf: node.isLeaf
+        }))
+      });
     }
 
     const root = heap[0] || null;
 
-    // 3. Generate prefix-free codes via DFS
+    // 4. Generate prefix-free codes via DFS
     const codes = new Map();
     const traverse = (node, codeStr) => {
       if (!node) return;
@@ -912,39 +1008,620 @@
       }
     }
 
-    // 4. Update 2D Canvas
+    // 5. Calculate total payload bits & average code length
+    let totalPayloadBits = 0;
+    for (const [byteVal, freq] of freqs.entries()) {
+      const c = codes.get(byteVal) || '0';
+      totalPayloadBits += freq * c.length;
+    }
+    const avgCodeLen = totalBytes > 0 ? (totalPayloadBits / totalBytes) : 8.0;
+
+    // 6. Save in state
+    state.currentExplorerData = {
+      bytes,
+      label,
+      freqs,
+      codes,
+      merges,
+      root,
+      totalBytes,
+      distinctSymbols: freqs.size,
+      entropy,
+      totalPayloadBits,
+      avgCodeLen
+    };
+
+    // 7. Update 2D Canvas & fit to view
     state.treeCanvas.setTree(root);
+    setTimeout(() => {
+      if (state.treeCanvas) state.treeCanvas.fitToView();
+    }, 40);
 
-    // 5. Populate Symbol Table
-    populateSymbolTable(freqs, codes);
+    // 8. Render 2D Frequency Graph
+    drawFrequencyGraph();
 
-    // 6. Populate Merges Table
+    // 9. Populate Symbol Table
+    populateSymbolTable();
+
+    // 10. Initialize Merge Player & populate merge table
+    initMergePlayer(merges);
     populateMergeTable(merges);
+
+    // 11. Synchronize Educational Explanation Panels
+    updateTreeExplanation(null);
+    updateGraphExplanation(null);
+    updateSymbolsExplanation();
+    updateMergesExplanation(merges.length > 0 ? 1 : 0);
   }
 
-  function populateSymbolTable(freqs, codes) {
+  // =========================================================================
+  // 2D INTERACTIVE FREQUENCY GRAPH
+  // =========================================================================
+
+  function handleGraphMouseMove(e) {
+    const canvas = document.getElementById('frequencyGraphCanvas');
+    if (!canvas || !state.graphBars) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    let hovered = null;
+    for (const bar of state.graphBars) {
+      if (mouseX >= bar.x && mouseX <= bar.x + bar.w && mouseY >= bar.y - 10 && mouseY <= bar.y + bar.h + 20) {
+        hovered = bar;
+        break;
+      }
+    }
+
+    const prev = state.graphHoveredByte;
+    state.graphHoveredByte = hovered ? hovered.byteVal : null;
+    state.graphHoverInfo = hovered ? { mouseX, mouseY, bar: hovered } : null;
+
+    if (prev !== state.graphHoveredByte) {
+      drawFrequencyGraph();
+      updateGraphExplanation(hovered);
+    }
+  }
+
+  function handleGraphMouseLeave() {
+    if (state.graphHoveredByte !== null) {
+      state.graphHoveredByte = null;
+      state.graphHoverInfo = null;
+      drawFrequencyGraph();
+
+      let selectedBar = null;
+      if (state.selectedSymbolByte !== null && state.graphBars) {
+        selectedBar = state.graphBars.find(b => b.byteVal === state.selectedSymbolByte);
+      }
+      updateGraphExplanation(selectedBar);
+    }
+  }
+
+  function handleGraphClick(e) {
+    const canvas = document.getElementById('frequencyGraphCanvas');
+    if (!canvas || !state.graphBars) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    for (const bar of state.graphBars) {
+      if (mouseX >= bar.x && mouseX <= bar.x + bar.w && mouseY >= bar.y - 10 && mouseY <= bar.y + bar.h + 20) {
+        selectSymbol(bar.byteVal);
+        break;
+      }
+    }
+  }
+
+  function drawFrequencyGraph() {
+    const canvas = document.getElementById('frequencyGraphCanvas');
+    if (!canvas) return;
+
+    const container = canvas.parentElement;
+    const width = (container ? container.clientWidth : 800) || 800;
+    const height = 360;
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    // Clear background
+    ctx.fillStyle = '#0B0B0E';
+    ctx.fillRect(0, 0, width, height);
+
+    const d = state.currentExplorerData;
+    if (!d || !d.freqs || d.freqs.size === 0) {
+      ctx.fillStyle = '#6E6E7A';
+      ctx.font = '13px JetBrains Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('No frequency data loaded. Enter text above to inspect distribution.', width / 2, height / 2);
+      return;
+    }
+
+    // Sort entries descending by frequency
+    const entries = Array.from(d.freqs.entries()).sort((a, b) => b[1] - a[1]);
+    const maxDisplay = Math.min(entries.length, 36);
+    const displayEntries = entries.slice(0, maxDisplay);
+    const maxFreq = entries[0][1];
+
+    const padLeft = 60;
+    const padRight = 30;
+    const padTop = 35;
+    const padBottom = 55;
+    const chartW = width - padLeft - padRight;
+    const chartH = height - padTop - padBottom;
+
+    // Y-Axis Horizontal Gridlines
+    ctx.lineWidth = 1;
+    ctx.font = '11px JetBrains Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+
+    const ticks = 4;
+    for (let i = 0; i <= ticks; i++) {
+      const frac = i / ticks;
+      const y = padTop + chartH - (frac * chartH);
+      const val = Math.round(maxFreq * frac);
+
+      ctx.strokeStyle = '#23232a';
+      ctx.beginPath();
+      ctx.moveTo(padLeft, y);
+      ctx.lineTo(padLeft + chartW, y);
+      ctx.stroke();
+
+      ctx.fillStyle = '#6E6E7A';
+      ctx.fillText(val.toString(), padLeft - 10, y);
+    }
+
+    // X-Axis Baseline
+    ctx.strokeStyle = '#3A3A46';
+    ctx.beginPath();
+    ctx.moveTo(padLeft, padTop + chartH);
+    ctx.lineTo(padLeft + chartW, padTop + chartH);
+    ctx.stroke();
+
+    // Draw Bars
+    const numBars = displayEntries.length;
+    const slotW = chartW / numBars;
+    const barW = Math.max(6, Math.min(36, slotW - 6));
+    state.graphBars = [];
+
+    displayEntries.forEach(([byteVal, freq], idx) => {
+      const pct = ((freq / d.totalBytes) * 100).toFixed(1);
+      const barH = Math.max(4, (freq / maxFreq) * chartH);
+      const barX = padLeft + (idx * slotW) + (slotW - barW) / 2;
+      const barY = padTop + chartH - barH;
+      const charStr = formatChar(byteVal);
+      const hexStr = '0x' + byteVal.toString(16).toUpperCase().padStart(2, '0');
+      const code = d.codes.get(byteVal) || '0';
+
+      state.graphBars.push({
+        x: barX,
+        y: barY,
+        w: barW,
+        h: barH,
+        byteVal,
+        freq,
+        pct,
+        charStr,
+        hexStr,
+        code
+      });
+
+      const isSelected = (byteVal === state.selectedSymbolByte);
+      const isHovered = (byteVal === state.graphHoveredByte);
+
+      // Create gradient fill
+      const grad = ctx.createLinearGradient(0, barY, 0, barY + barH);
+      if (isSelected) {
+        grad.addColorStop(0, '#FF8A50');
+        grad.addColorStop(1, '#FF5A0A');
+        ctx.shadowColor = '#FF5A0A';
+        ctx.shadowBlur = 12;
+      } else if (isHovered) {
+        grad.addColorStop(0, '#FFA726');
+        grad.addColorStop(1, '#FF7043');
+        ctx.shadowColor = '#FFA726';
+        ctx.shadowBlur = 8;
+      } else {
+        grad.addColorStop(0, '#FF5A0A');
+        grad.addColorStop(1, '#7844F9');
+        ctx.shadowBlur = 0;
+      }
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, barW, barH, [4, 4, 0, 0]);
+      ctx.fill();
+
+      if (isSelected || isHovered) {
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+      ctx.shadowBlur = 0;
+
+      // Frequency label on top of bar
+      if (barW >= 18) {
+        ctx.fillStyle = (isSelected || isHovered) ? '#FFFFFF' : '#A0A0B0';
+        ctx.font = '10px JetBrains Mono, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(freq.toString(), barX + barW / 2, barY - 6);
+      }
+
+      // Symbol label below X-axis
+      ctx.save();
+      ctx.translate(barX + barW / 2, padTop + chartH + 12);
+      if (numBars > 18) {
+        ctx.rotate(Math.PI / 4);
+      }
+      ctx.fillStyle = isSelected ? '#FF5A0A' : (isHovered ? '#FFA726' : '#C0C0D0');
+      ctx.font = 'bold 11px JetBrains Mono, monospace';
+      ctx.textAlign = numBars > 18 ? 'left' : 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(charStr, 0, 0);
+      ctx.restore();
+    });
+
+    // Draw Floating Hover Tooltip
+    if (state.graphHoverInfo && state.graphHoverInfo.bar) {
+      const b = state.graphHoverInfo.bar;
+      const tooltipLines = [
+        `Symbol: ${b.charStr} (${b.hexStr} / Dec ${b.byteVal})`,
+        `Count: ${b.freq} occurrences (${b.pct}% of input)`,
+        `Huffman Code: ${b.code} (${b.code.length} bits)`,
+        `Bitstream Load: ${b.freq * b.code.length} bits`,
+        `💡 Click bar to isolate in Tree & Table`
+      ];
+
+      ctx.font = '11px JetBrains Mono, monospace';
+      let maxTextW = 0;
+      tooltipLines.forEach(line => {
+        const tw = ctx.measureText(line).width;
+        if (tw > maxTextW) maxTextW = tw;
+      });
+
+      const boxW = maxTextW + 24;
+      const boxH = (tooltipLines.length * 18) + 16;
+      let tipX = b.x + b.w / 2 - boxW / 2;
+      let tipY = b.y - boxH - 12;
+
+      // Keep within bounds
+      if (tipX < padLeft) tipX = padLeft;
+      if (tipX + boxW > width - padRight) tipX = width - padRight - boxW;
+      if (tipY < 10) tipY = b.y + b.h + 20;
+
+      // Draw Tooltip Box
+      ctx.fillStyle = '#151519';
+      ctx.strokeStyle = '#FF5A0A';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = '#000000';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.roundRect(tipX, tipY, boxW, boxH, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Tooltip Text
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      tooltipLines.forEach((line, lIdx) => {
+        if (lIdx === 0) ctx.fillStyle = '#FF5A0A';
+        else if (lIdx === tooltipLines.length - 1) ctx.fillStyle = '#A0A0B0';
+        else ctx.fillStyle = '#FFFFFF';
+
+        ctx.fillText(line, tipX + 12, tipY + 10 + (lIdx * 18));
+      });
+    }
+
+    // Update Metrics Pills
+    const pillsContainer = document.getElementById('graphStatsPills');
+    if (pillsContainer) {
+      const theoBytes = Math.ceil((d.totalBytes * d.entropy) / 8);
+      const huffmanBytes = Math.ceil(d.totalPayloadBits / 8);
+      pillsContainer.innerHTML = `
+        <div class="graph-pill"><strong>Input Size:</strong> <span>${formatBytes(d.totalBytes)} (${d.totalBytes} B)</span></div>
+        <div class="graph-pill"><strong>Distinct Symbols:</strong> <span>${d.distinctSymbols} / 256</span></div>
+        <div class="graph-pill"><strong>Shannon Entropy:</strong> <span style="color: var(--accent-orange);">${d.entropy.toFixed(3)} bits/sym</span></div>
+        <div class="graph-pill"><strong>Theoretical Limit:</strong> <span>${formatBytes(theoBytes)}</span></div>
+        <div class="graph-pill"><strong>Huffman Encoded Bits:</strong> <span style="color: var(--accent-green);">${formatBytes(huffmanBytes)} (${d.totalPayloadBits} bits)</span></div>
+        <div class="graph-pill"><strong>Avg Code Length:</strong> <span>${d.avgCodeLen.toFixed(2)} bits/sym</span></div>
+      `;
+    }
+
+    // Update Contextual Narrative Explanation
+    const narrativeEl = document.getElementById('graphExplanationText');
+    if (narrativeEl) {
+      let narrative = '';
+      if (d.entropy < 3.2) {
+        narrative = `The input "${escapeHtml(d.label)}" exhibits a <strong>highly skewed frequency distribution</strong> with low Shannon entropy (${d.entropy.toFixed(3)} bits/symbol). Frequent symbols such as '${formatChar(entries[0][0])}' dominate, allowing the greedy Huffman algorithm to assign concise 1 to 3 bit codes. This results in superior lossless compression efficiency (~${((1 - (d.totalPayloadBits / (d.totalBytes * 8))) * 100).toFixed(1)}% raw payload reduction before archive headers).`;
+      } else if (d.entropy < 6.8) {
+        narrative = `The input "${escapeHtml(d.label)}" shows a <strong>typical natural language / structured data distribution</strong> with moderate Shannon entropy (${d.entropy.toFixed(3)} bits/symbol). The Huffman priority queue assigns variable-length codes ranging from ${Math.min(...Array.from(d.codes.values()).map(c => c.length))} bits for frequent symbols to ${Math.max(...Array.from(d.codes.values()).map(c => c.length))} bits for rare symbols, achieving an average code length of ${d.avgCodeLen.toFixed(2)} bits/symbol compared to uncompressed 8.00 bits.`;
+      } else {
+        narrative = `The input "${escapeHtml(d.label)}" displays a <strong>near-uniform, high-entropy distribution</strong> (${d.entropy.toFixed(3)} of 8.00 bits/symbol). Symbols occur with nearly equal probability across the spectrum. In accordance with Shannon's Source Coding Theorem, Huffman coding cannot significantly reduce the payload size (average code length ${d.avgCodeLen.toFixed(2)} bits/symbol ≈ 8 bits/symbol), illustrating why pre-compressed or encrypted files are resistant to additional lossless Huffman shrinkage.`;
+      }
+      narrativeEl.innerHTML = narrative;
+    }
+  }
+
+  // =========================================================================
+  // SYMBOL FREQUENCY & CODES TABLE
+  // =========================================================================
+
+  function populateSymbolTable() {
     const tbody = document.getElementById('symbolTableBody');
-    if (!tbody) return;
+    if (!tbody || !state.currentExplorerData) return;
     tbody.innerHTML = '';
 
-    const entries = Array.from(freqs.entries()).sort((a, b) => b[1] - a[1]);
+    const d = state.currentExplorerData;
+    const entries = Array.from(d.freqs.entries()).sort((a, b) => b[1] - a[1]);
 
     entries.forEach(([byteVal, freq]) => {
       const tr = document.createElement('tr');
-      const code = codes.get(byteVal) || '0';
+      const code = d.codes.get(byteVal) || '0';
       const charStr = formatChar(byteVal);
       const hexStr = '0x' + byteVal.toString(16).toUpperCase().padStart(2, '0');
+      const freqPct = ((freq / d.totalBytes) * 100).toFixed(2) + '%';
+      const bitContrib = freq * code.length;
+      const contribPct = d.totalPayloadBits > 0 ? ((bitContrib / d.totalPayloadBits) * 100).toFixed(1) + '%' : '100%';
+
+      tr.className = 'clickable-row' + (byteVal === state.selectedSymbolByte ? ' active-symbol-tr' : '');
+      tr.setAttribute('data-byte', byteVal);
 
       tr.innerHTML = `
         <td>${byteVal}</td>
         <td><code>${hexStr}</code></td>
-        <td><strong style="color: var(--accent-orange); font-family: var(--font-mono);">${charStr}</strong></td>
+        <td><strong style="color: var(--accent-orange); font-family: var(--font-mono);">${escapeHtml(charStr)}</strong></td>
         <td>${freq}</td>
+        <td>${freqPct}</td>
         <td><code style="color: var(--accent-orange); font-weight: bold;">${code}</code></td>
         <td>${code.length}</td>
+        <td><strong>${bitContrib} bits</strong> <span style="font-size: 11px; color: var(--text-muted);">(${contribPct})</span></td>
       `;
+
+      tr.addEventListener('click', () => {
+        selectSymbol(byteVal);
+      });
+
       tbody.appendChild(tr);
     });
+
+    const expText = document.getElementById('symbolTableExplanation');
+    if (expText) {
+      expText.innerHTML = `Huffman coding generated an optimal prefix-free codebook for <strong>${d.distinctSymbols} distinct symbols</strong> across ${formatBytes(d.totalBytes)}. Total compressed payload: <strong>${d.totalPayloadBits} bits</strong> (average <strong>${d.avgCodeLen.toFixed(2)} bits/symbol</strong> vs uncompressed 8.00 bits/symbol). No code is a prefix of any other code, guaranteeing instantaneous and unambiguous decoding without delimiter markers. Click any row to isolate the symbol in the Tree and 2D Frequency Graph.`;
+    }
+  }
+
+  // Cross-Highlighting Synchronization
+  function selectSymbol(byteVal) {
+    state.selectedSymbolByte = byteVal;
+
+    // 1. Highlight row in Symbol Table
+    const tbody = document.getElementById('symbolTableBody');
+    if (tbody) {
+      const rows = tbody.querySelectorAll('tr');
+      rows.forEach(tr => {
+        if (parseInt(tr.getAttribute('data-byte'), 10) === byteVal) {
+          tr.classList.add('active-symbol-tr');
+          tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          tr.classList.remove('active-symbol-tr');
+        }
+      });
+    }
+
+    // 2. Redraw 2D Frequency Graph with selected bar highlighted
+    drawFrequencyGraph();
+
+    // 3. Highlight and pan to leaf node in Huffman Tree Canvas
+    if (state.treeCanvas) {
+      state.treeCanvas.selectNodeByByte(byteVal);
+    }
+
+    // 4. Update Educational Explanations with selected symbol info
+    let leafNode = null;
+    const findLeaf = (node) => {
+      if (!node || leafNode) return;
+      if (node.isLeaf && node.byteVal === byteVal) {
+        leafNode = node;
+        return;
+      }
+      findLeaf(node.left);
+      findLeaf(node.right);
+    };
+    if (state.currentExplorerData && state.currentExplorerData.root) {
+      findLeaf(state.currentExplorerData.root);
+    }
+    state.selectedTreeNode = leafNode;
+    updateTreeExplanation(leafNode);
+
+    let matchingBar = null;
+    if (state.graphBars) {
+      matchingBar = state.graphBars.find(b => b.byteVal === byteVal);
+    }
+    updateGraphExplanation(matchingBar);
+  }
+
+  // =========================================================================
+  // PRIORITY QUEUE / GREEDY MERGERS PLAYER
+  // =========================================================================
+
+  function initMergePlayer(merges) {
+    if (state.mergeState.timer) {
+      clearInterval(state.mergeState.timer);
+      state.mergeState.timer = null;
+    }
+    state.mergeState.isPlaying = false;
+    state.mergeState.steps = merges || [];
+    state.mergeState.currentStep = merges && merges.length > 0 ? 1 : 0;
+
+    const btnPlay = document.getElementById('btnMergePlay');
+    if (btnPlay) {
+      btnPlay.innerHTML = '▶ Auto-Play';
+      btnPlay.classList.remove('playing');
+    }
+
+    renderMergeStep(state.mergeState.currentStep);
+  }
+
+  function goToMergeStep(stepNum) {
+    const total = state.mergeState.steps.length;
+    if (total === 0) return;
+    if (stepNum < 1) stepNum = 1;
+    if (stepNum > total) stepNum = total;
+
+    state.mergeState.currentStep = stepNum;
+    renderMergeStep(stepNum);
+  }
+
+  function toggleMergePlay() {
+    const total = state.mergeState.steps.length;
+    if (total <= 1) return;
+
+    const btnPlay = document.getElementById('btnMergePlay');
+    if (state.mergeState.isPlaying) {
+      // Pause
+      clearInterval(state.mergeState.timer);
+      state.mergeState.timer = null;
+      state.mergeState.isPlaying = false;
+      if (btnPlay) {
+        btnPlay.innerHTML = '▶ Auto-Play';
+        btnPlay.classList.remove('playing');
+      }
+    } else {
+      // Start auto play
+      if (state.mergeState.currentStep >= total) {
+        state.mergeState.currentStep = 1;
+        renderMergeStep(1);
+      }
+      state.mergeState.isPlaying = true;
+      if (btnPlay) {
+        btnPlay.innerHTML = '⏸ Pause';
+        btnPlay.classList.add('playing');
+      }
+
+      state.mergeState.timer = setInterval(() => {
+        if (state.mergeState.currentStep < total) {
+          goToMergeStep(state.mergeState.currentStep + 1);
+        } else {
+          // Reached the end
+          clearInterval(state.mergeState.timer);
+          state.mergeState.timer = null;
+          state.mergeState.isPlaying = false;
+          if (btnPlay) {
+            btnPlay.innerHTML = '▶ Auto-Play';
+            btnPlay.classList.remove('playing');
+          }
+        }
+      }, 1200);
+    }
+  }
+
+  function renderMergeStep(stepNum) {
+    const total = state.mergeState.steps.length;
+    const badge = document.getElementById('mergeStepBadge');
+    const bar = document.getElementById('mergeProgressBar');
+    const heading = document.getElementById('mergeStepHeading');
+    const statusBadge = document.getElementById('mergeStepStatusBadge');
+    const leftSym = document.getElementById('mergeLeftSymbol');
+    const leftFreq = document.getElementById('mergeLeftFreq');
+    const rightSym = document.getElementById('mergeRightSymbol');
+    const rightFreq = document.getElementById('mergeRightFreq');
+    const parentSym = document.getElementById('mergeParentSymbol');
+    const parentFreq = document.getElementById('mergeParentFreq');
+    const queueContainer = document.getElementById('mergeQueueChips');
+    const explanation = document.getElementById('mergeStepExplanation');
+
+    if (total === 0) {
+      if (badge) badge.textContent = 'Step 0 of 0';
+      if (bar) bar.style.width = '0%';
+      if (heading) heading.textContent = 'NO MERGES NEEDED (SINGLE SYMBOL)';
+      if (statusBadge) {
+        statusBadge.textContent = 'Trivial Leaf';
+        statusBadge.className = 'target-status-badge badge-feasible';
+      }
+      if (leftSym) leftSym.textContent = '-';
+      if (leftFreq) leftFreq.textContent = 'Weight: -';
+      if (rightSym) rightSym.textContent = '-';
+      if (rightFreq) rightFreq.textContent = 'Weight: -';
+      if (parentSym) parentSym.textContent = '-';
+      if (parentFreq) parentFreq.textContent = 'Combined: -';
+      if (queueContainer) queueContainer.innerHTML = '<span style="color: var(--text-muted);">Queue is empty</span>';
+      if (explanation) explanation.textContent = 'Input consists of 0 or 1 distinct symbol. A trivial single-node tree was formed with code "0".';
+      return;
+    }
+
+    const step = state.mergeState.steps[stepNum - 1];
+    if (!step) return;
+
+    if (badge) badge.textContent = `Step ${stepNum} of ${total}`;
+    if (bar) bar.style.width = `${Math.round((stepNum / total) * 100)}%`;
+    if (heading) {
+      heading.textContent = stepNum === total
+        ? `STEP ${stepNum} (FINAL): MERGED INTO TREE ROOT`
+        : `STEP ${stepNum} OF ${total}: GREEDY MIN-HEAP COMBINATION`;
+    }
+    if (statusBadge) {
+      if (stepNum === total) {
+        statusBadge.textContent = 'Tree Formed (Root Completed)';
+        statusBadge.className = 'target-status-badge badge-feasible';
+      } else {
+        statusBadge.textContent = `In Progress (${total - stepNum} merges remaining)`;
+        statusBadge.className = 'target-status-badge badge-neutral';
+      }
+    }
+
+    if (leftSym) leftSym.textContent = step.leftSymbol || '-';
+    if (leftFreq) leftFreq.textContent = `Weight: ${step.leftFreq}`;
+    if (rightSym) rightSym.textContent = step.rightSymbol || '-';
+    if (rightFreq) rightFreq.textContent = `Weight: ${step.rightFreq}`;
+    if (parentSym) parentSym.textContent = step.parentSymbol || '-';
+    if (parentFreq) parentFreq.textContent = `Weight: ${step.combinedFreq}`;
+
+    // Queue chips
+    if (queueContainer) {
+      queueContainer.innerHTML = '';
+      if (step.queueSnapshot && step.queueSnapshot.length > 0) {
+        step.queueSnapshot.forEach(item => {
+          const chip = document.createElement('div');
+          chip.className = `queue-chip ${item.isLeaf ? 'queue-chip-leaf' : ''}`;
+          chip.innerHTML = `<span>${escapeHtml(item.name)}</span> <span class="chip-freq">w:${item.freq}</span>`;
+          queueContainer.appendChild(chip);
+        });
+      } else {
+        queueContainer.innerHTML = '<span style="color: var(--accent-green); font-family: var(--font-mono); font-size: 12px;">✔ Priority Queue empty — Root node created</span>';
+      }
+    }
+
+    // Explanation
+    if (explanation) {
+      explanation.textContent = step.explanation || step.action;
+    }
+
+    // Highlight row in merge table
+    const tbody = document.getElementById('mergeTableBody');
+    if (tbody) {
+      const rows = tbody.querySelectorAll('tr');
+      rows.forEach((tr, idx) => {
+        if (idx + 1 === stepNum) {
+          tr.classList.add('active-merge-tr');
+          tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          tr.classList.remove('active-merge-tr');
+        }
+      });
+    }
+
+    // Update live Educational Panel for Greedy Merges
+    updateMergesExplanation(stepNum);
   }
 
   function populateMergeTable(merges) {
@@ -952,17 +1629,276 @@
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    merges.forEach((m) => {
+    merges.forEach((m, idx) => {
       const tr = document.createElement('tr');
+      tr.className = 'clickable-row' + (idx + 1 === state.mergeState.currentStep ? ' active-merge-tr' : '');
       tr.innerHTML = `
         <td><strong>#${m.step}</strong></td>
-        <td><span style="color: var(--accent-orange);">${m.leftName}</span></td>
-        <td><span style="color: var(--accent-purple);">${m.rightName}</span></td>
+        <td><span style="color: var(--accent-orange); font-family: var(--font-mono);">${escapeHtml(m.leftName)}</span></td>
+        <td><span style="color: var(--accent-purple); font-family: var(--font-mono);">${escapeHtml(m.rightName)}</span></td>
         <td><strong>${m.combinedFreq}</strong></td>
-        <td><span style="color: var(--text-secondary);">${m.action}</span></td>
+        <td><span style="color: var(--text-secondary);">${escapeHtml(m.action)}</span></td>
       `;
+
+      tr.addEventListener('click', () => {
+        goToMergeStep(m.step);
+      });
+
       tbody.appendChild(tr);
     });
+  }
+
+  // =========================================================================
+  // EDUCATIONAL EXPLANATION PANELS (DYNAMIC DATA HOOKS)
+  // =========================================================================
+
+  function updateTreeExplanation(selectedNode) {
+    const d = state.currentExplorerData;
+    const summaryBadge = document.getElementById('treeLiveSummaryBadge');
+    const totalBytesEl = document.getElementById('treeLiveTotalBytes');
+    const distinctEl = document.getElementById('treeLiveDistinct');
+    const rootWeightEl = document.getElementById('treeLiveRootWeight');
+    const maxDepthEl = document.getElementById('treeLiveMaxDepth');
+    const inspector = document.getElementById('treeLiveNodeInspector');
+
+    if (!d) {
+      if (summaryBadge) summaryBadge.textContent = 'Awaiting Input';
+      if (totalBytesEl) totalBytesEl.textContent = '-';
+      if (distinctEl) distinctEl.textContent = '-';
+      if (rootWeightEl) rootWeightEl.textContent = '-';
+      if (maxDepthEl) maxDepthEl.textContent = '-';
+      if (inspector) inspector.innerHTML = '<div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">No input analyzed. Type text above or upload a file.</div>';
+      return;
+    }
+
+    let maxDepth = 0;
+    if (d.codes && d.codes.size > 0) {
+      for (const code of d.codes.values()) {
+        if (code.length > maxDepth) maxDepth = code.length;
+      }
+    }
+
+    if (summaryBadge) {
+      summaryBadge.textContent = `${formatBytes(d.totalBytes)} | ${d.distinctSymbols} distinct symbols`;
+    }
+    if (totalBytesEl) totalBytesEl.textContent = `${formatBytes(d.totalBytes)} (${d.totalBytes} B)`;
+    if (distinctEl) distinctEl.textContent = `${d.distinctSymbols} leaf nodes`;
+    if (rootWeightEl) rootWeightEl.textContent = `${d.root ? d.root.freq : d.totalBytes} (100% of input)`;
+    if (maxDepthEl) maxDepthEl.textContent = `${maxDepth} bits (depth)`;
+
+    if (!inspector) return;
+
+    const node = selectedNode || state.selectedTreeNode;
+    if (node) {
+      if (node.isLeaf) {
+        const charStr = formatChar(node.byteVal);
+        const hexStr = '0x' + node.byteVal.toString(16).toUpperCase().padStart(2, '0');
+        const code = node.code || (d.codes.get(node.byteVal) || '0');
+        const pathSteps = code.split('').map((bit) => bit === '0' ? `<span style="color: var(--accent-orange);">Left (0)</span>` : `<span style="color: var(--accent-purple);">Right (1)</span>`).join(' → ');
+
+        inspector.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+            <div style="font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--accent-orange);">
+              🍃 INSPECTING LEAF NODE: <strong style="color: #fff;">'${escapeHtml(charStr)}'</strong> (Dec: ${node.byteVal}, Hex: ${hexStr})
+            </div>
+            <span class="edu-badge" style="color: var(--accent-orange); border-color: var(--accent-orange);">Leaf Node</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 10px;">
+            <div><span style="color: var(--text-muted); font-size: 11px; text-transform: uppercase;">Frequency (Weight):</span><br><strong style="font-family: var(--font-mono); font-size: 14px;">${node.freq}</strong> (${((node.freq / d.totalBytes) * 100).toFixed(2)}%)</div>
+            <div><span style="color: var(--text-muted); font-size: 11px; text-transform: uppercase;">Assigned Huffman Code:</span><br><code style="color: var(--accent-orange); font-size: 14px; font-weight: bold;">${code}</code> (${code.length} bits)</div>
+            <div><span style="color: var(--text-muted); font-size: 11px; text-transform: uppercase;">Bit Contribution:</span><br><strong style="font-family: var(--font-mono); font-size: 14px;">${node.freq * code.length} bits</strong></div>
+          </div>
+          <div style="font-size: 12.5px; color: var(--text-secondary); background: var(--bg-card); padding: 8px 12px; border-radius: 4px; font-family: var(--font-mono);">
+            <strong>Traversal Path from Root:</strong> Root → ${pathSteps || 'Root Node'}
+          </div>
+        `;
+      } else {
+        const leftDesc = node.left ? (node.left.isLeaf ? `'${formatChar(node.left.byteVal)}' (w:${node.left.freq})` : `Subtree #${node.left.id} (w:${node.left.freq})`) : 'None';
+        const rightDesc = node.right ? (node.right.isLeaf ? `'${formatChar(node.right.byteVal)}' (w:${node.right.freq})` : `Subtree #${node.right.id} (w:${node.right.freq})`) : 'None';
+        const code = node.code || '';
+        const pathSteps = code ? code.split('').map((bit) => bit === '0' ? `<span style="color: var(--accent-orange);">Left (0)</span>` : `<span style="color: var(--accent-purple);">Right (1)</span>`).join(' → ') : 'Root of Tree';
+
+        inspector.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+            <div style="font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--accent-purple);">
+              ⚙️ INSPECTING INTERNAL NODE: #${node.id}
+            </div>
+            <span class="edu-badge" style="color: var(--accent-purple); border-color: var(--accent-purple);">Internal Merge</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 10px;">
+            <div><span style="color: var(--text-muted); font-size: 11px; text-transform: uppercase;">Combined Weight:</span><br><strong style="font-family: var(--font-mono); font-size: 14px;">${node.freq}</strong></div>
+            <div><span style="color: var(--text-muted); font-size: 11px; text-transform: uppercase;">Left Child (Bit 0):</span><br><span style="font-family: var(--font-mono); color: var(--accent-orange);">${escapeHtml(leftDesc)}</span></div>
+            <div><span style="color: var(--text-muted); font-size: 11px; text-transform: uppercase;">Right Child (Bit 1):</span><br><span style="font-family: var(--font-mono); color: var(--accent-purple);">${escapeHtml(rightDesc)}</span></div>
+          </div>
+          <div style="font-size: 12.5px; color: var(--text-secondary); background: var(--bg-card); padding: 8px 12px; border-radius: 4px; font-family: var(--font-mono);">
+            <strong>Subtree Prefix Path:</strong> Root → ${pathSteps}
+          </div>
+        `;
+      }
+    } else {
+      inspector.innerHTML = `
+        <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">
+          💡 Click any node or leaf in the canvas above to inspect its exact weight, parent/child relationships, and generated binary path.
+        </div>
+      `;
+    }
+  }
+
+  function updateGraphExplanation(bar) {
+    const d = state.currentExplorerData;
+    if (!d || !d.freqs || d.freqs.size === 0) return;
+
+    const totalEl = document.getElementById('graphEduTotalBytes');
+    const distinctEl = document.getElementById('graphEduDistinct');
+    const mostFreqEl = document.getElementById('graphEduMostFreq');
+    const leastFreqEl = document.getElementById('graphEduLeastFreq');
+    const narrativeEl = document.getElementById('graphEduNarrative');
+    const detailEl = document.getElementById('graphEduSelectedDetail');
+    const entropyBadge = document.getElementById('graphEntropyBadge');
+
+    if (totalEl) totalEl.textContent = `${formatBytes(d.totalBytes)} (${d.totalBytes} B)`;
+    if (distinctEl) distinctEl.textContent = `${d.distinctSymbols} of 256`;
+    if (entropyBadge) entropyBadge.textContent = `Entropy: ${d.entropy.toFixed(3)} bits/sym`;
+
+    const sorted = Array.from(d.freqs.entries()).sort((a, b) => b[1] - a[1]);
+    const most = sorted[0];
+    const least = sorted[sorted.length - 1];
+
+    if (mostFreqEl) {
+      const mostCode = d.codes.get(most[0]) || '';
+      mostFreqEl.innerHTML = `<strong>'${escapeHtml(formatChar(most[0]))}'</strong> (${most[1]}x, ${((most[1] / d.totalBytes) * 100).toFixed(1)}%) <small style="color:var(--text-muted);">[code: ${mostCode}]</small>`;
+    }
+    if (leastFreqEl) {
+      const leastCode = d.codes.get(least[0]) || '';
+      leastFreqEl.innerHTML = `<strong>'${escapeHtml(formatChar(least[0]))}'</strong> (${least[1]}x, ${((least[1] / d.totalBytes) * 100).toFixed(1)}%) <small style="color:var(--text-muted);">[code: ${leastCode}]</small>`;
+    }
+
+    if (narrativeEl) {
+      const mostChar = formatChar(most[0]);
+      const mostPct = ((most[1] / d.totalBytes) * 100).toFixed(1);
+      const mostCode = d.codes.get(most[0]) || '';
+      const leastCode = d.codes.get(least[0]) || '';
+
+      if (d.entropy < 3.2) {
+        narrativeEl.innerHTML = `<strong>Skewed Distribution Analysis:</strong> The most frequent symbol <code>'${escapeHtml(mostChar)}'</code> accounts for <strong>${mostPct}%</strong> of all analyzed data. Because it appears so often, the greedy algorithm merged it very late, placing it near the root with a short <strong>${mostCode.length}-bit code (<code>${mostCode}</code>)</strong>. In contrast, rare symbols receive longer codes up to <strong>${leastCode.length} bits</strong>. This high frequency disparity enables optimal compression efficiency.`;
+      } else if (d.entropy < 6.8) {
+        narrativeEl.innerHTML = `<strong>Natural Language / Structured Distribution:</strong> Frequencies follow a typical descending curve with Shannon entropy of <strong>${d.entropy.toFixed(3)} bits/symbol</strong>. Common characters receive shorter codes (down to <strong>${mostCode.length} bits</strong>), while infrequent characters receive up to <strong>${leastCode.length} bits</strong>, giving an average code length of <strong>${d.avgCodeLen.toFixed(2)} bits/symbol</strong> compared to standard fixed 8.00 bits.`;
+      } else {
+        narrativeEl.innerHTML = `<strong>Near-Uniform / High Entropy Distribution:</strong> The input has Shannon entropy of <strong>${d.entropy.toFixed(3)} bits/symbol</strong> (close to the 8.00 maximum). Because symbols occur with nearly equal probability, the frequency bars are relatively flat. All Huffman codes have similar lengths (~<strong>${d.avgCodeLen.toFixed(1)} bits</strong>), meaning standard Huffman coding cannot significantly reduce file size without dictionary or transform pre-processing.`;
+      }
+    }
+
+    if (detailEl) {
+      if (bar) {
+        detailEl.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--accent-orange);">
+              🎯 INSPECTING SYMBOL: '${escapeHtml(bar.charStr)}' (${bar.hexStr} / Dec ${bar.byteVal})
+            </div>
+            <span class="edu-badge" style="color: var(--accent-orange);">Frequency: ${bar.freq} (${bar.pct}%)</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 8px; font-family: var(--font-mono); font-size: 12.5px;">
+            <div><span style="color: var(--text-muted);">Occurrences:</span> <strong>${bar.freq}</strong></div>
+            <div><span style="color: var(--text-muted);">Huffman Code:</span> <code style="color: var(--accent-orange); font-weight: bold;">${bar.code}</code> (${bar.code.length} bits)</div>
+            <div><span style="color: var(--text-muted);">Bitstream Load:</span> <strong>${bar.freq * bar.code.length} bits</strong></div>
+          </div>
+        `;
+      } else {
+        detailEl.innerHTML = `
+          <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">
+            💡 Hover over or click any bar above to inspect its exact frequency, percentage, and assigned Huffman code.
+          </div>
+        `;
+      }
+    }
+  }
+
+  function updateSymbolsExplanation() {
+    const d = state.currentExplorerData;
+    if (!d || !d.freqs || d.freqs.size === 0) return;
+
+    const totalEl = document.getElementById('symbolsEduTotalBytes');
+    const shortestEl = document.getElementById('symbolsEduShortest');
+    const longestEl = document.getElementById('symbolsEduLongest');
+    const avgEl = document.getElementById('symbolsEduAvgBits');
+    const analysisEl = document.getElementById('symbolsEduAnalysis');
+
+    if (totalEl) totalEl.textContent = `${formatBytes(d.totalBytes)} (${d.totalBytes} B)`;
+
+    let minLen = Infinity;
+    let maxLen = 0;
+    let shortestSym = null;
+    let longestSym = null;
+
+    for (const [byteVal, code] of d.codes.entries()) {
+      if (code.length < minLen) {
+        minLen = code.length;
+        shortestSym = byteVal;
+      }
+      if (code.length > maxLen) {
+        maxLen = code.length;
+        longestSym = byteVal;
+      }
+    }
+
+    if (shortestEl && shortestSym !== null) {
+      shortestEl.innerHTML = `${minLen} bits <small style="color:var(--text-muted);">('${escapeHtml(formatChar(shortestSym))}')</small>`;
+    }
+    if (longestEl && longestSym !== null) {
+      longestEl.innerHTML = `${maxLen} bits <small style="color:var(--text-muted);">('${escapeHtml(formatChar(longestSym))}')</small>`;
+    }
+    if (avgEl) {
+      avgEl.textContent = `${d.avgCodeLen.toFixed(2)} bits/sym`;
+    }
+
+    if (analysisEl) {
+      const rawBits = d.totalBytes * 8;
+      const compBits = d.totalPayloadBits;
+      const savingsPct = rawBits > 0 ? (((rawBits - compBits) / rawBits) * 100).toFixed(1) : 0;
+
+      analysisEl.innerHTML = `The generated codebook contains <strong>${d.distinctSymbols} distinct symbol entries</strong>. Average code length is <strong>${d.avgCodeLen.toFixed(2)} bits/symbol</strong> (compared to fixed 8.00 bits uncompressed). Total raw bitstream payload: <strong>${compBits} bits</strong> (saving <strong>${savingsPct}%</strong> before archive metadata). Shannon entropy establishes a theoretical limit of <strong>${d.entropy.toFixed(3)} bits/symbol</strong>; Huffman's greedy construction achieves optimality within $H \\le L_{\\text{avg}} < H + 1$.`;
+    }
+  }
+
+  function updateMergesExplanation(stepNum) {
+    const d = state.currentExplorerData;
+    const walkthroughEl = document.getElementById('mergesEduStepWalkthrough');
+    const badge = document.getElementById('mergesStepIndicatorBadge');
+    const mergesBadge = document.getElementById('mergesLiveBadge');
+
+    const totalSteps = state.mergeState.steps.length;
+    if (mergesBadge) mergesBadge.textContent = totalSteps > 0 ? `Step ${stepNum} of ${totalSteps}` : 'Single Symbol';
+    if (badge) badge.textContent = `Step ${stepNum} of ${totalSteps}`;
+
+    if (!walkthroughEl) return;
+
+    if (totalSteps === 0) {
+      walkthroughEl.innerHTML = `The analyzed input contains only 1 distinct symbol. A trivial single-node tree was formed with code <code>0</code>; no priority queue merges were necessary.`;
+      return;
+    }
+
+    const step = state.mergeState.steps[stepNum - 1];
+    if (!step) return;
+
+    const isFinal = (stepNum === totalSteps);
+    walkthroughEl.innerHTML = `
+      <div style="font-size: 13.5px; line-height: 1.6; color: var(--text-secondary);">
+        <p>
+          <strong>1. Minimum Extractions:</strong> The priority queue extracted two subtrees with the lowest weights:
+          <span style="color: var(--accent-orange); font-family: var(--font-mono);"><strong>${escapeHtml(step.leftSymbol)}</strong> (weight: ${step.leftFreq})</span> and
+          <span style="color: var(--accent-purple); font-family: var(--font-mono);"><strong>${escapeHtml(step.rightSymbol)}</strong> (weight: ${step.rightFreq})</span>.
+        </p>
+        <p>
+          <strong>2. Combined Parent:</strong> Created new internal parent node <code>${escapeHtml(step.parentSymbol)}</code> with weight <code>${step.leftFreq} + ${step.rightFreq} = <strong>${step.combinedFreq}</strong></code>. Left edge assigned bit <code>0</code>, right edge assigned bit <code>1</code>.
+        </p>
+        <p>
+          <strong>3. Queue State After Step:</strong> Parent re-inserted into the min-heap.
+          ${isFinal
+            ? `<strong style="color: var(--accent-green);">✔ Tree Construction Complete!</strong> Exactly 1 node remains in the queue, which is the root of the Huffman Tree.`
+            : `There are <strong>${step.queueSnapshot.length}</strong> node(s) remaining in the queue. The algorithm will proceed with the next merge.`}
+        </p>
+      </div>
+    `;
   }
 
   // =========================================================================
